@@ -1,0 +1,16 @@
+# Agent and web UI
+openai-agents==0.24.0
+gradio==6.31.0
+httpx==0.28.1
+python-dotenv>=1.0,<2
+tavily-python>=0.5,<1
+
+# Document ingestion and retrieval
+chromadb==1.5.9
+pypdf==7.1.0
+rank-bm25==0.2.2
+jieba==0.42.1
+
+# Local CPU reranking
+onnxruntime==1.31.1
+tokenizers==0.23.3
