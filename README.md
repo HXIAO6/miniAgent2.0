@@ -185,6 +185,9 @@ miniAgent2.0/
 
 ## 测试与评估
 
+第一阶段重构的模块边界、离线基线和验收分工见 [阶段说明](docs/phase1.md)。
+测试资料全文、问题及安全样例见 [合成资料说明](docs/synthetic-data.md)。
+
 离线单元测试与 GitHub Actions 使用相同方式，不调用 Ollama 或生成模型服务；本地存在重排模型时仍会运行真实 ONNX 测试：
 
 ```powershell
