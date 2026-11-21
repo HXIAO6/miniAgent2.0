@@ -29,3 +29,9 @@ knowledge/
 data/
 models/
 .cache/
+
+# 前端依赖、构建与浏览器测试产物
+node_modules/
+*.tsbuildinfo
+playwright-report/
+test-results/

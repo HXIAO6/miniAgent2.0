@@ -1,6 +1,10 @@
 # Agent and web UI
 openai-agents==0.24.0
 gradio==6.31.0
+# 独立 HTTP 后端；Gradio 暂留作迁移对照入口。
+fastapi==0.162.5
+uvicorn==0.54.0
+python-multipart==0.0.33
 httpx==0.28.1
 python-dotenv>=1.0,<2
 tavily-python>=0.5,<1

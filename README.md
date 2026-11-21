@@ -2,7 +2,7 @@
 
 基于 Python 的个人知识库助手，具备基础 RAG、流式对话和部分 Agent 工具能力。上传资料后提问，可在回答中查看来源引用并展开核对原文。
 
-项目使用 Gradio 提供网页界面，通过 Ollama 运行 BGE-M3，结合 ChromaDB、BM25 和本地 ONNX 重排检索资料，再通过 LangChain 调用 OpenAI 兼容模型服务生成回答；保留旧 OpenAI Agents SDK 后端用于对照与回退。
+项目使用 assistant-ui + React + TypeScript 提供网页界面，FastAPI 提供独立的聊天与文档接口。通过 Ollama 运行 BGE-M3，结合 ChromaDB、BM25 和本地 ONNX 重排检索资料，再通过 LangChain 调用原有 OpenAI 兼容模型服务；LangGraph 负责编排。迁移期间保留 Gradio 和旧 OpenAI Agents SDK 后端。
 
 ## 功能
 
@@ -12,6 +12,7 @@
 - **引用溯源**：回答使用 `[资料1]` 等编号，提供原文展开区域和候选分数表。
 - **文档管理**：重复导入跳过、同名更新、重新分块、确认删除及回收站备份。
 - **对话记录**：SQLite 保存聊天历史，较长上下文通过摘要压缩。
+- **独立会话**：新界面支持多会话、刷新恢复、停止生成、结构化来源和工具执行状态；旧聊天可只读查看。
 - **Agent 工具**：普通聊天模式支持时间查询、Tavily 联网搜索和项目目录内的文件读写。
 - **自动知识库 Agent**：LangGraph 路由后由模型决定是否调用 `search_knowledge`；保留强制检索模式用于可靠问答和对照。
 
@@ -92,22 +93,33 @@ SUMMARY_MODEL=your_chat_model
 
 服务需支持 OpenAI 兼容的 Chat Completions 和流式输出；使用 Agent 工具时还需支持工具调用。模板中的 `deepseek-flash` 是默认标识，请按服务商提供的模型名称修改。`TAVILY_API_KEY` 为可选项，未配置不影响本地知识库检索。
 
-### 4. 自检并启动
+### 4. 构建前端、自检并启动
+
+前端要求 Node.js 24 LTS，依赖安装在仓库内；npm 缓存可指定到 D 盘。构建完成后由 FastAPI 同源提供页面，不需要一直运行 Node.js：
+
+```powershell
+Set-Location frontend
+npm ci --cache D:\npm-cache
+npm run build
+Set-Location ..
+```
 
 ```powershell
 .\.venv\Scripts\python.exe -m miniagent.cli.doctor
 .\.venv\Scripts\python.exe -m miniagent
 ```
 
-浏览器访问 <http://127.0.0.1:7860>。自检会检查 Ollama、重排文件、生成模型配置和本地数据库；不会发送生成请求，因此配置检查通过不代表服务端模型一定可用。
+浏览器访问 <http://127.0.0.1:8000>，API 文档位于 <http://127.0.0.1:8000/docs>。自检不发送生成请求，因此配置检查通过不代表服务端模型一定可用。
+
+旧界面可执行 `miniagent-gradio`，访问 <http://127.0.0.1:7860>。两个界面共用知识库，请选择一个执行聊天和文档变更，不要同时操作。开发代理、事件协议和验收细节见 [前端接入说明](docs/frontend.md)。
 
 ## 使用方法
 
-1. 在“知识库管理”中选择资料，点击“导入 / 更新资料”，等待导入成功。
+1. 在右侧“资料库”中选择资料，点击“导入 / 更新资料”，等待导入成功。
 2. 输入问题，回答中的 `[资料N]` 对应本轮选中的片段，展开来源查看原文。
-3. 在“检索设置与候选分数”中切换检索方式、调整候选数量、重排阈值及最终片段数。
-4. 普通聊天可关闭知识库检索；关闭“仅依据知识库回答”后可使用 Agent 工具。
-5. 删除资料时选择文件，核对清单并勾选确认，再点击“删除所选文档”。
+3. 在“设置”中调整检索方式、候选数量、重排阈值及最终片段数；来源页可查看候选诊断。
+4. “调用模式”可选择强制检索、Agent 自动决定或普通聊天；普通聊天沿用已有工具策略。
+5. 删除资料时选择文件，核对清单并勾选确认，再点击“删除所选资料”。
 
 候选表用于诊断，不表示所有候选都参与了回答。重排分数表示相关性，不是答案正确率；即使有片段通过筛选，仍需核对原文是否支持结论。程序会标记不存在的引用编号，但不会自动验证全部结论。
 
@@ -141,7 +153,7 @@ BM25 索引在首次关键词检索时从 Chroma 文本构建，缓存在进程�
 
 ## 配置项
 
-配置由 `src/config.py` 从项目根目录 `.env` 读取，已设置的进程环境变量优先。相对路径以项目根目录为基准。
+配置由 `src/miniagent/config.py` 从项目根目录 `.env` 读取，已设置的进程环境变量优先。相对路径以项目根目录为基准。
 
 | 变量 | 默认值 | 说明 |
 | :--- | :--- | :--- |
@@ -156,10 +168,12 @@ BM25 索引在首次关键词检索时从 Chroma 文本构建，缓存在进程�
 | `RAG_EMBED_MODEL` | `bge-m3:latest` | 文档与问题使用相同的 embedding 模型 |
 | `RAG_RERANK_MODEL_DIR` | `models/bge-reranker-base` | ONNX 重排模型目录 |
 | `TAVILY_API_KEY` | 空 | 可选，联网搜索密钥 |
-| `APP_HOST` / `APP_PORT` | `127.0.0.1` / `7860` | 网页监听地址与端口 |
+| `APP_HOST` / `APP_PORT` | `127.0.0.1` / `7860` | 监听地址 / 旧 Gradio 端口 |
+| `API_PORT` | `8000` | FastAPI 与新网页端口 |
+| `WEB_MEMORY_DB_PATH` | `data/web_chat.sqlite3` | 新界面独立结构化会话库 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 | `STRICT_KNOWLEDGE_DEFAULT` | `true` | 默认仅依据知识库回答 |
-| `MEMORY_DB_PATH` | `data/memory.sqlite3` | SQLite 聊天数据库路径 |
+| `MEMORY_DB_PATH` | `data/memory.sqlite3` | 旧 Gradio 聊天库，新界面仅只读查看 |
 
 上下文超过 30 条消息时压缩较早内容，保留最近 8 条原文；SQLite 中仍保存完整历史。当前没有自动提取长期用户事实或偏好的独立记忆系统。
 
@@ -167,13 +181,15 @@ BM25 索引在首次关键词检索时从 Chroma 文本构建，缓存在进程�
 
 ```text
 miniAgent2.0/
+├── frontend/             # assistant-ui / React / TypeScript / Vite
 ├── src/miniagent/
+│   ├── api/              # FastAPI 路由、请求校验、SSE、静态页面
 │   ├── application/      # 聊天与文档业务
 │   ├── knowledge/        # 解析、混合检索、ONNX 重排、引用数据
 │   ├── memory/           # SQLite 与存储上下文
 │   ├── adapters/         # LangChain 与旧 SDK
 │   ├── tools/            # 共享 Python 工具
-│   ├── ui/               # 页面、回调、渲染、CSS
+│   ├── ui/               # 保留的 Gradio 页面、回调、渲染、CSS
 │   ├── cli/              # 自检与模型准备
 │   ├── prompts/          # 回答与摘要模板
 │   ├── workflows/        # LangGraph 模式路由与请求状态
@@ -210,6 +226,7 @@ python -m miniagent
 第一阶段重构的模块边界、离线基线和验收分工见 [阶段说明](docs/phase1.md)。
 第二阶段的环境、启动方式、LangChain 调用流程和验收结果见 [LangChain 接入说明](docs/phase2.md)。
 第三阶段的自动检索、工具预算和真实资料验收见 [LangGraph 工作流说明](docs/phase3.md)。
+新前端、ChatService、接口协议与测试材料见 [前端接入说明](docs/frontend.md)。
 测试资料全文、问题及安全样例见 [合成资料说明](docs/synthetic-data.md)。
 
 离线单元测试与 GitHub Actions 使用相同方式，不调用 Ollama 或生成模型服务；本地存在重排模型时仍会运行真实 ONNX 测试：
@@ -244,6 +261,7 @@ Remove-Item Env:MINIAGENT_OFFLINE_TESTS
 - 单文件不超过 30 MiB；扫描 PDF 需先 OCR，暂不支持 Word、Excel 或图片直接入库。
 - PDF 引用为文件页序号，可能与印刷页码不同。
 - 面向个人、单机、单进程使用，尚无登录、用户隔离或多进程写入支持。
+- 新界面展示引用片段，不提供 PDF 原文件预览；人工审批、完整注入防护与 LangSmith 评测仍属后续阶段。
 - 文件工具可以读写项目目录内的文件；使用工具模式前应确认项目中存放的内容适合交给模型处理。
 - 不要直接为已有向量库切换 embedding 模型；更换模型需使用独立库并重新索引。
 - 重排阈值无法保证识别所有无答案问题，引用与缺失事实仍需人工核对。

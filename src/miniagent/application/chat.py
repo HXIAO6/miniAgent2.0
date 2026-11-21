@@ -105,13 +105,14 @@ async def _execute_chat(request: ChatRequest, dependencies: ChatDependencies):
     conversation_history.append({"role": "user", "content": message})
     # 历史只保留消息数据；展示标记由调用方生成，不作为服务输出协议。
     message_history = normalized + [{"role": "user", "content": message}]
-    def snapshot(kind="progress", expanded=False, update_scores=False, persist=False):
+    def snapshot(kind="progress", expanded=False, update_scores=False, persist=False, activity=None):
         # 深复制避免后续检索诊断更新污染已经发出的事件。
         return ChatEvent(
             kind=kind, history=copy.deepcopy(message_history), answer=current_reply,
             status=thinking_text, elapsed_seconds=(thinking_finished_at or time.monotonic()) - started_at,
             expanded=expanded, candidates=copy.deepcopy(candidates),
-            selected=copy.deepcopy(retrieved), update_scores=update_scores, persist=persist)
+            selected=copy.deepcopy(retrieved), update_scores=update_scores, persist=persist,
+            activity=activity or {})
 
     started_at = time.monotonic()
     thinking_text = ""
@@ -174,7 +175,9 @@ async def _execute_chat(request: ChatRequest, dependencies: ChatDependencies):
                 yield snapshot(expanded=expanded)
             elif event.kind == "tool":
                 thinking_text += f"\n\n🔧 正在调用工具：{event.text}"
-                yield snapshot(expanded=True)
+                yield snapshot(expanded=True, activity={"type": "tool.started", "name": event.text})
+            elif event.kind == "tool_completed":
+                yield snapshot(expanded=True, activity={"type": "tool.completed", "name": event.text})
             elif event.kind == "retrieval":
                 # 自动工具返回的原始资料决定引用编号，不让模型提供文件名或位置。
                 candidates = event.data["candidates"]

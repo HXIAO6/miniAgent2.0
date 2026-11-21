@@ -113,6 +113,8 @@ class LangChainBackend:
                         if not isinstance(update, dict):
                             continue
                         for message in update.get("messages", []):
+                            if isinstance(message, ToolMessage):
+                                yield ModelEvent("tool_completed", message.name or "工具")
                             if isinstance(message, ToolMessage) and message.name == "search_knowledge" and message.artifact:
                                 yield ModelEvent("retrieval", "知识库检索完成", message.artifact)
                             if isinstance(message, AIMessage):

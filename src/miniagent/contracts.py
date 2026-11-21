@@ -34,6 +34,8 @@ class ChatEvent:
     selected: list[dict] = field(default_factory=list)
     update_scores: bool = False
     persist: bool = False
+    # 结构化工具状态供 HTTP/assistant-ui 使用，参数与工具原始输出不发送前端。
+    activity: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

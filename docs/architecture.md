@@ -1,12 +1,14 @@
 # 当前目录与依赖边界
 
 本文记录当前包结构与职责边界；第三阶段的工作流详见 [阶段说明](phase3.md)。
+新前端接入后默认入口改为 FastAPI；本页下方保留包拆分阶段的验收记录。当前网页结构与完整协议见 [前端接入说明](frontend.md)。
 核心实现位于 `src/miniagent/`；根目录 `.env`、`knowledge/`、`models/` 和 `data/` 的含义及路径保持不变。
 
 ```text
 miniAgent2.0/
 ├── pyproject.toml                 # 包元数据、资源和启动入口
 ├── requirements.txt               # 依赖唯一维护清单，由 pyproject 引用
+├── frontend/                      # assistant-ui + React + TypeScript
 ├── configs/                       # 预留安全与实验配置，README 说明用途
 ├── migrations/                    # 预留版本化数据库迁移，本次不执行迁移
 ├── src/
@@ -16,6 +18,7 @@ miniAgent2.0/
 │   │   ├── config.py              # 项目路径、配置、日志
 │   │   ├── contracts.py           # 请求与事件契约
 │   │   ├── application/
+│   │   │   ├── chat_service.py    # 会话、运行、SSE 事件与取消
 │   │   │   ├── chat.py            # 聊天流程、检索注入、拒答和引用校验
 │   │   │   └── documents.py       # 导入、查询、确认删除用例
 │   │   ├── knowledge/
@@ -24,6 +27,7 @@ miniAgent2.0/
 │   │   │   ├── rerank.py          # 原 ONNX 推理
 │   │   │   └── citations.py       # 引用原始数据序列化
 │   │   ├── memory/
+│   │   │   ├── thread_store.py    # 新界面结构化存储，旧库只读
 │   │   │   ├── memory_store.py    # 原 SQLite 存储
 │   │   │   └── context.py         # 按配置路径获取存储实例
 │   │   ├── adapters/
@@ -36,6 +40,7 @@ miniAgent2.0/
 │   │   │   ├── handlers.py        # Gradio 回调与返回格式适配
 │   │   │   ├── renderers.py       # HTML、引用展开、候选表
 │   │   │   └── assets/styles.css  # 页面样式
+│   │   ├── api/                   # 新主入口，FastAPI 与请求模型
 │   │   ├── cli/
 │   │   │   ├── doctor.py          # 启动自检
 │   │   │   └── setup_reranker.py  # 模型下载与校验
@@ -52,7 +57,9 @@ miniAgent2.0/
 ## 调用方向
 
 ```text
-启动命令 → ui.app → ui.handlers → application.chat / documents
+启动命令 → api.app → application.chat_service → application.chat
+React 页面 → HTTP / SSE ↗                 ↓
+旧 Gradio → ui.handlers → application.chat / documents
                                       ↓
                          bootstrap 注入模型、工具、知识库
                                       ↓
@@ -70,7 +77,7 @@ security 与 observability 仍为预留目录，不表示已经实现权限、�
 
 ## 安装与启动
 
-所有安装均使用用户指定的 `miniAgent2.0` 环境；本次没有下载新依赖，只将当前项目注册为可编辑包：
+所有 Python 安装均使用用户指定的 `miniAgent2.0` 环境。包拆分阶段只注册了可编辑包；新前端另需按接入说明构建：
 
 ```powershell
 conda activate miniAgent2.0

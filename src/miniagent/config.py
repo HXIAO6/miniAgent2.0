@@ -44,6 +44,9 @@ class Settings:
     tavily_api_key: str = field(default=os.getenv("TAVILY_API_KEY", ""), repr=False)
     host: str = os.getenv("APP_HOST", "127.0.0.1")
     port: int = int(os.getenv("APP_PORT", "7860"))
+    api_port: int = int(os.getenv("API_PORT", "8000"))
+    # 新界面结构化存储独立于旧 Gradio 历史，避免迁移时覆盖原有成果。
+    web_memory_db: Path = _path("WEB_MEMORY_DB_PATH", PROJECT_DIR / "data" / "web_chat.sqlite3")
     log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()
     strict_knowledge_default: bool = _bool("STRICT_KNOWLEDGE_DEFAULT", True)
     data_dir: Path = PROJECT_DIR / "data"
