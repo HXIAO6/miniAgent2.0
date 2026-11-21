@@ -4,6 +4,7 @@ import {
   ThreadPrimitive, useExternalStoreRuntime, useAuiState, type AppendMessage, type ThreadMessageLike,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
+import { KnowledgeMark } from "./components/KnowledgeMark";
 import type { Message, Source } from "./types";
 import type { useChat } from "./useChat";
 
@@ -22,7 +23,7 @@ function UserMessage() {
 function AssistantMessage() {
   const data = useContext(MessageData);
   return <MessagePrimitive.Root className="message assistant-message">
-    <span className="assistant-avatar" aria-hidden="true">m</span>
+    <KnowledgeMark className="assistant-avatar" />
     <div className="answer-body">
       <div className="message-byline">MiniAgent <span>知识助手</span></div>
       <MessagePrimitive.Parts components={{ Text: MarkdownText }} />
@@ -75,11 +76,12 @@ export function Chat({ chat, inspect }: { chat: ReturnType<typeof useChat>; insp
       <ThreadPrimitive.Root className="thread">
         <ThreadPrimitive.Viewport className="thread-viewport">
           <ThreadPrimitive.Empty>
-            <div className="welcome"><div className="welcome-icon">m<span>✦</span></div>
-              <p className="eyebrow">YOUR PERSONAL KNOWLEDGE SPACE</p><h1>让资料，成为答案。</h1>
-              <p>从你的文档出发，获得有据可查的回答。</p>
+            {/* 空白页像打开一本资料簿，优先引导真实提问，不添加虚构统计。 */}
+            <div className="welcome"><div className="welcome-book" aria-hidden="true"><KnowledgeMark className="welcome-icon" /><span className="book-line" /><span className="book-line short" /></div>
+              <h1>资料在这里，<br />思路从这里开始。</h1>
+              <p>提一个问题，连接散落在文档里的线索。<br />每份回答，都可以回到原文核对。</p>
               <div className="suggestions">{["总结我的资料中最重要的内容", "根据我的手册，整理操作步骤", "比较资料中的不同观点"].map((text) =>
-                <button key={text} disabled={chat.loading || chat.legacy} onClick={() => void chat.send(text)}>{text}<span>↗</span></button>)}</div>
+                <button key={text} disabled={chat.loading || chat.legacy} onClick={() => void chat.send(text)}>{text}<span aria-hidden="true">＋</span></button>)}</div>
             </div>
           </ThreadPrimitive.Empty>
           <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
@@ -92,7 +94,7 @@ export function Chat({ chat, inspect }: { chat: ReturnType<typeof useChat>; insp
                 <ComposerPrimitive.Send className="send-button" aria-label="发送消息">↑</ComposerPrimitive.Send>}
             </div>
           </ComposerPrimitive.Root>}
-        <p className="composer-note">回答完成安全检查后展示 · 相关片段发送至模型服务 · 请核对来源</p>
+        <p className="composer-note">回答经安全检查后展示。相关资料片段会发送至模型服务。</p>
       </ThreadPrimitive.Root>
     </AssistantRuntimeProvider>
   </MessageData.Provider>;

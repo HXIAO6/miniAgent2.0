@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Chat } from "./Chat";
+import { KnowledgeMark } from "./components/KnowledgeMark";
 import { SourcesPanel } from "./components/SourcesPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { KnowledgePanel } from "./KnowledgePanel";
@@ -20,15 +21,16 @@ export default function App() {
   const inspect = (selected: Source[], all: Source[]) => { setSources(selected); setCandidates(all); setTab("sources"); };
   return <div className="app-shell">
     <aside className="sidebar">
-      <a className="brand" href="/" aria-label="MiniAgent 首页"><span className="brand-mark">m</span><span>miniagent<span className="brand-version">个人知识空间</span></span></a>
-      <button className="new-chat" disabled={chat.running} onClick={() => void chat.newThread()}><span>＋</span>新建对话 <kbd>↗</kbd></button>
+      {/* 导航以文档书签为唯一品牌图形，文字直接说明当前空间用途。 */}
+      <a className="brand" href="/" aria-label="MiniAgent 首页"><KnowledgeMark className="brand-mark" /><span>MiniAgent<span className="brand-version">个人知识工作台</span></span></a>
+      <button className="new-chat" disabled={chat.running} onClick={() => void chat.newThread()}><span aria-hidden="true">＋</span>新建对话</button>
       <div className="nav-heading">对话记录</div>
       <nav className="thread-list" aria-label="对话列表">{chat.threads.map((thread) => <button key={thread.id} disabled={chat.running} className={chat.threadId === thread.id ? "thread-item active" : "thread-item"} onClick={() => { setSources([]); void chat.selectThread(thread.id); }}><span>◷</span><span>{thread.title}</span></button>)}</nav>
-      <div className="sidebar-footer"><button onClick={() => void chat.showLegacy()} disabled={chat.running}>▤ 查看旧版聊天 <span>只读</span></button><div className="local-badge"><i />本机知识库<span>PERSONAL</span></div></div>
+      <div className="sidebar-footer"><button onClick={() => void chat.showLegacy()} disabled={chat.running}>查看旧版聊天 <span>只读</span></button><div className="local-badge"><i />资料保存在本机</div></div>
     </aside>
     <main className="main-panel">
       <header className="topbar"><div><span className="workspace-label">知识助手</span><span className="topbar-divider">/</span><span className="thread-title">{chat.legacy ? "旧版聊天记录" : chat.threads.find((thread) => thread.id === chat.threadId)?.title ?? "新对话"}</span></div>
-        <div className="topbar-actions"><span className="model-pill"><i />{model || "连接模型中"}</span><button title="删除当前会话" aria-label="删除当前会话" onClick={() => void chat.deleteThread()} disabled={!chat.threadId || chat.running}>⌫</button></div></header>
+        <div className="topbar-actions"><span className="model-pill">{model || "读取模型配置中"}</span><button className="delete-thread" title="删除当前会话" aria-label="删除当前会话" onClick={() => void chat.deleteThread()} disabled={!chat.threadId || chat.running}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button></div></header>
       {chat.error ? <div className="error-banner" role="alert">{chat.error}</div> : null}
       <Chat key={chat.legacy ? "legacy" : chat.threadId ?? "loading"} chat={chat} inspect={inspect} />
     </main>

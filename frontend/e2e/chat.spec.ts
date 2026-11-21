@@ -8,6 +8,10 @@ test("流式回答、来源、刷新历史、独立会话与停止生成", async
   // 每次运行使用新会话，避免上一次验收留下的历史影响断言。
   await page.getByRole("button", { name: /新建对话/ }).click();
   await expect(page.locator(".assistant-message")).toHaveCount(0);
+  // 欢迎内容只在消息区滚动，避免桌面输入框被挤出屏幕。
+  const composer = await page.locator(".composer").boundingBox();
+  expect(composer).not.toBeNull();
+  expect(composer!.y + composer!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   await page.screenshot({ path: "test-results/desktop.png", fullPage: true });
   await page.getByRole("textbox", { name: "输入问题" }).fill("根据我的手册，冷却液多久更换？");
   await page.getByRole("button", { name: "发送消息", exact: true }).click();
