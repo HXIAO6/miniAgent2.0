@@ -49,6 +49,9 @@ class Settings:
     web_memory_db: Path = _path("WEB_MEMORY_DB_PATH", PROJECT_DIR / "data" / "web_chat.sqlite3")
     log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()
     strict_knowledge_default: bool = _bool("STRICT_KNOWLEDGE_DEFAULT", True)
+    # 服务端安全配置不接受聊天参数覆盖；默认只开放时间工具。
+    security_policy_path: Path = _path("SECURITY_POLICY_PATH", PROJECT_DIR / "configs" / "security.json")
+    tool_workspace: Path = _path("TOOL_WORKSPACE", PROJECT_DIR / "tool_workspace")
     data_dir: Path = PROJECT_DIR / "data"
     knowledge_dir: Path = PROJECT_DIR / "knowledge"
     memory_db: Path = _path("MEMORY_DB_PATH", PROJECT_DIR / "data" / "memory.sqlite3")

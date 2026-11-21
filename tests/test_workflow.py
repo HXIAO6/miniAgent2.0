@@ -124,7 +124,8 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         dependencies = ChatDependencies(self.kb, Mock(), Mock(), Mock(), logging.getLogger("test"))
         events = [event async for event in stream_chat(ChatRequest("查询", knowledge_mode="auto"), dependencies)]
         self.assertEqual(events[-1].kind, "error")
-        self.assertIn("langchain", events[-1].answer)
+        # API 层有明确的参数提示；应用层异常统一隐藏，避免泄露 SDK 细节。
+        self.assertIn("运行失败", events[-1].answer)
         self.kb.retrieve.assert_not_called()
 
 

@@ -64,6 +64,12 @@ def run_startup_checks() -> list[tuple[str, bool, str]]:
     checks.append(("模型后端", backend_valid,
                    f"当前后端：{settings.chat_backend}。" +
                    ("依赖可用。" if backend_valid else "请检查 CHAT_BACKEND 并安装 requirements.txt 中的依赖。")))
+    try:
+        from miniagent.security.policy import load_policy
+        policy = load_policy(str(settings.security_policy_path))
+        checks.append(("安全策略", True, f"策略有效；普通聊天允许 {len(policy.allowed_tools)} 个工具，文件写入未开放。"))
+    except (OSError, ValueError, TypeError):
+        checks.append(("安全策略", False, "策略文件缺失或无效；请检查 SECURITY_POLICY_PATH，不会自动关闭防护。"))
     logger.info("启动自检完成：%s", "; ".join(f"{name}={'通过' if ok else '注意'}" for name, ok, _ in checks))
     return checks
 

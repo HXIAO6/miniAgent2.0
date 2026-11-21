@@ -25,9 +25,10 @@ Thumbs.db
 sessions/
 
 # 本地知识库、模型与运行产物
-knowledge/
+/knowledge/
 data/
 models/
+tool_workspace/
 .cache/
 
 # 前端依赖、构建与浏览器测试产物

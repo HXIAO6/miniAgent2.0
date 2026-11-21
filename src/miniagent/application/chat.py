@@ -6,6 +6,8 @@ import time
 
 from miniagent.contracts import ChatRequest, ChatEvent, ChatDependencies, ModelEvent
 from miniagent.knowledge.citations import evidence_json
+from miniagent.security.policy import get_policy
+from miniagent.security.output import guarded_events
 
 
 def message_content_to_text(content):
@@ -58,13 +60,13 @@ async def stream_chat(request: ChatRequest, dependencies: ChatDependencies):
     """统一经过应用图路由，原执行函数继续负责回答和持久化标记。"""
     from miniagent.workflows.chat_graph import stream_workflow
     try:
-        async for event in stream_workflow(request, dependencies, _execute_chat):
+        async for event in guarded_events(stream_workflow(request, dependencies, _execute_chat)):
             yield event
     except Exception as error:
         dependencies.logger.error("工作流失败，类型=%s", type(error).__name__)
         history = [message for message in request.history if isinstance(message, dict)]
         yield ChatEvent(kind="error", history=history + [{"role": "user", "content": request.message}],
-                        answer=f"❌ 发生错误: {error}", update_scores=True, persist=True)
+                        answer="运行失败，请检查服务状态后重试。", update_scores=True, persist=True)
 
 
 async def _execute_chat(request: ChatRequest, dependencies: ChatDependencies):
@@ -136,7 +138,10 @@ async def _execute_chat(request: ChatRequest, dependencies: ChatDependencies):
             retrieval = await asyncio.to_thread(
                 dependencies.knowledge_base.retrieve, message, top_k, candidate_k, retrieval_mode,
                 use_rerank, rerank_threshold, rerank_k)
-            candidates, retrieved = retrieval["candidates"], retrieval["selected"]
+            # 上下文边界再次检查，替换检索后端也不能直接把危险片段送入模型。
+            policy = get_policy()
+            candidates = policy.filter_hits(retrieval["candidates"])
+            retrieved = policy.filter_hits(retrieval["selected"])
             if any(hit.get("query_truncated") for hit in candidates):
                 thinking_text += "\n问题较长，重排只使用问题的前 128 token；生成回答仍接收完整问题。"
             if retrieved:

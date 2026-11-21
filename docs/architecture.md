@@ -73,7 +73,7 @@ React 页面 → HTTP / SSE ↗                 ↓
 
 原 Chroma/BM25/ONNX 算法没有重写。`rag.py` 仍有原有索引和文档回收实现，后续有真实需求时再抽存储接口，避免本次引入第二套存储实现。
 引用数据直接使用 `knowledge.citations`，界面展示直接使用 `ui.renderers`；检索模块不再反向导入界面。
-security 与 observability 仍为预留目录，不表示已经实现权限、审批、注入检测或 LangSmith 审计。
+第四阶段已实现 security 中的规则策略、检索过滤、工具白名单和输出门禁，详见 [安全基础层说明](phase4.md)。observability 仍为预留目录，尚未实现人工审批、多用户权限或 LangSmith 审计。
 
 ## 安装与启动
 

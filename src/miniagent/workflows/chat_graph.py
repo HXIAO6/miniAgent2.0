@@ -5,6 +5,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.config import get_stream_writer
 from miniagent.workflows.state import ChatState
 from miniagent.tools.retrieval import RetrievalSession
+from miniagent.security.policy import get_policy, audit
 
 
 class AutomaticBackend:
@@ -46,6 +47,12 @@ async def stream_workflow(request, dependencies, execute):
         selected = "automatic" if current.use_knowledge and current.knowledge_mode == "auto" else "forced"
         return {"route": selected}
 
+    def security_gate(state):
+        """独立安全节点：先确认服务端策略有效，再进入模型或检索分支。"""
+        get_policy()
+        audit("workflow", "allowed", ("policy_loaded",))
+        return {}
+
     async def forced(state):
         await relay(state["request"], dependencies)
         return {"completed": True}
@@ -62,10 +69,12 @@ async def stream_workflow(request, dependencies, execute):
         return {"completed": True}
 
     graph = StateGraph(ChatState)
+    graph.add_node("security_gate", security_gate)
     graph.add_node("route", route)
     graph.add_node("forced", forced)
     graph.add_node("automatic", automatic)
-    graph.add_edge(START, "route")
+    graph.add_edge(START, "security_gate")
+    graph.add_edge("security_gate", "route")
     graph.add_conditional_edges("route", lambda state: state["route"],
                                 {"forced": "forced", "automatic": "automatic"})
     graph.add_edge("forced", END)

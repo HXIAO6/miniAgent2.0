@@ -1,5 +1,6 @@
 """新 HTTP 服务真实联调：隔离合成库 + 现有 DeepSeek/Ollama/ONNX，不读正式资料。"""
 from dataclasses import replace
+import argparse
 import json
 from pathlib import Path
 import sys
@@ -15,8 +16,9 @@ from miniagent.knowledge.rag import KnowledgeBase
 from miniagent.knowledge.ingest import ingest_file
 
 
-def main():
-    output = Path("D:/miniAgent2.0-experiments/web")
+def main(output_dir="D:/miniAgent2.0-experiments/web"):
+    """输出目录可单独指定，阶段验收不覆盖以前的实验记录。"""
+    output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix="live-api-", dir=output))
     config = replace(settings, web_memory_db=root / "web.sqlite3", memory_db=root / "legacy.sqlite3",
@@ -66,4 +68,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", default="D:/miniAgent2.0-experiments/web")
+    main(parser.parse_args().output_dir)

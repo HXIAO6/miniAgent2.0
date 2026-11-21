@@ -31,7 +31,7 @@ class SecurityBoundaryTests(unittest.TestCase):
             self.assertEqual(json.loads(evidence_json([hit]))[0]["text"], text)
 
     def test_document_instruction_does_not_enable_tools_in_strict_mode(self):
-        # 检查实际传入旧 Runner 的 Agent 没有工具，并非证明模型能识别所有攻击。
+        # 已识别的恶意片段在模型前被拒绝；无可信证据时不启动 Runner。
         hit = dict(id="attack", source="合成攻击.md", location="正文",
                    text=self.cases["document_instruction"]["text"])
         kb, agent, runner = Mock(), Mock(), Mock()
@@ -46,8 +46,8 @@ class SecurityBoundaryTests(unittest.TestCase):
         async def consume():
             return [event async for event in stream_chat(ChatRequest("根据资料回答"), dependencies)]
         asyncio.run(consume())
-        self.assertEqual(agent.clone.call_args.kwargs["tools"], [])
-        self.assertIs(runner.run_streamed.call_args.args[0], agent.clone.return_value)
+        runner.run_streamed.assert_not_called()
+        agent.clone.assert_not_called()
 
 
 if __name__ == "__main__":

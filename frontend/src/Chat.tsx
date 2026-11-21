@@ -92,7 +92,7 @@ export function Chat({ chat, inspect }: { chat: ReturnType<typeof useChat>; insp
                 <ComposerPrimitive.Send className="send-button" aria-label="发送消息">↑</ComposerPrimitive.Send>}
             </div>
           </ComposerPrimitive.Root>}
-        <p className="composer-note">检索在本机完成 · 回答内容会发送至已配置的模型服务 · 请核对来源</p>
+        <p className="composer-note">回答完成安全检查后展示 · 相关片段发送至模型服务 · 请核对来源</p>
       </ThreadPrimitive.Root>
     </AssistantRuntimeProvider>
   </MessageData.Provider>;

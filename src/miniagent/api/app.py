@@ -58,7 +58,8 @@ def create_app(settings=None, knowledge_base=None, store=None, executor=None, de
     @app.get("/api/health")
     async def health():
         return {"status": "ok", "backend": settings.chat_backend, "model": settings.chat_model,
-                "capabilities": {"cancel": True, "sources": True, "approval": False}}
+                "capabilities": {"cancel": True, "sources": True, "approval": False,
+                                 "output_review": True, "token_stream_before_review": False}}
 
     @app.get("/api/threads")
     async def threads():

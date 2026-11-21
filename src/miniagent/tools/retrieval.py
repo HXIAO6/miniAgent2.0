@@ -3,6 +3,7 @@ import asyncio
 import copy
 from miniagent.knowledge.citations import evidence_json
 from miniagent.knowledge.rag import select_context
+from miniagent.security.policy import get_policy
 
 
 class RetrievalSession:
@@ -31,6 +32,10 @@ class RetrievalSession:
             result = await asyncio.to_thread(
                 self.knowledge_base.retrieve, query, request.top_k, request.candidate_k,
                 request.retrieval_mode, request.use_rerank, request.rerank_threshold, request.rerank_k)
+            # 工具结果进入 Agent 前审核，不依赖模型识别指令。
+            policy = get_policy()
+            result = dict(result, candidates=policy.filter_hits(result["candidates"]),
+                          selected=policy.filter_hits(result["selected"]))
             # 同一块再次出现时更新诊断分数，避免把首次查询的低分当作最终入选分数。
             candidate_map = {hit["id"]: hit for hit in self.candidates}
             candidate_map.update({hit["id"]: copy.deepcopy(hit) for hit in result["candidates"]})

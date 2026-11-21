@@ -94,7 +94,9 @@ class ChatServiceTests(unittest.TestCase):
         self.kb.retrieve.side_effect = RuntimeError("离线模拟错误")
         final = self.collect(ChatRequest("查询"))[-1]
         self.assertEqual(final.kind, "error")
-        self.assertIn("离线模拟错误", final.answer)
+        # 安全阶段统一隐藏 SDK 异常细节，取消语义仍向上传递。
+        self.assertNotIn("离线模拟错误", final.answer)
+        self.assertIn("运行失败", final.answer)
         self.kb.retrieve.side_effect = asyncio.CancelledError()
         with self.assertRaises(asyncio.CancelledError):
             self.collect(ChatRequest("取消"))

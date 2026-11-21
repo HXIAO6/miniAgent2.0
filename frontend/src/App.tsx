@@ -39,7 +39,7 @@ export default function App() {
         </section> : null}
         {tab === "settings" ? <section className="settings-panel"><p className="eyebrow">CONVERSATION SETTINGS</p><h2>回答方式</h2><p className="muted">设置作用于下一条问题，历史回答不变。</p>
           <label>调用模式<select aria-label="调用模式" value={chat.options.mode} disabled={chat.running} onChange={(event) => chat.setOptions({ ...chat.options, mode: event.target.value as typeof chat.options.mode })}><option value="forced">强制检索知识库</option><option value="auto" disabled={backend !== "langchain"}>Agent 自动决定</option><option value="chat">普通聊天</option></select></label>
-          <p className="setting-help">自动模式只提供知识库工具；普通聊天沿用现有工具权限。强制模式可在无依据时直接拒答。</p>
+          <p className="setting-help">自动模式只提供知识库工具；普通聊天仅开放服务端白名单工具。强制模式可在无依据时直接拒答。</p>
           <label className="checkbox-setting"><input type="checkbox" checked={chat.options.only_knowledge} disabled={chat.running || chat.options.mode !== "forced"} onChange={(event) => chat.setOptions({ ...chat.options, only_knowledge: event.target.checked })} />仅依据知识库回答</label>
           <label>检索方式<select aria-label="检索方式" value={chat.options.retrieval_mode} disabled={chat.running} onChange={(event) => chat.setOptions({ ...chat.options, retrieval_mode: event.target.value as typeof chat.options.retrieval_mode })}><option value="hybrid">混合检索（推荐）</option><option value="vector">仅向量检索</option><option value="bm25">仅 BM25</option></select></label>
           <label className="checkbox-setting"><input type="checkbox" checked={chat.options.use_rerank} disabled={chat.running} onChange={(event) => chat.setOptions({ ...chat.options, use_rerank: event.target.checked })} />本地重排与阈值过滤</label>

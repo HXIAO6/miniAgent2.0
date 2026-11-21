@@ -1,0 +1,5 @@
+{
+  "allowed_sources": null,
+  "denied_sources": [],
+  "allowed_tools": ["get_current_time"]
+}

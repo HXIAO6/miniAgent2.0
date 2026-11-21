@@ -6,9 +6,7 @@ from miniagent.tools import implementations
 
 def build_chat_dependencies(settings, knowledge_base, logger, runner=None, compressor=None):
     """集中选择后端，UI 与检索层不负责创建模型和工具。"""
-    functions = (
-        implementations.get_current_time, implementations.search_web,
-        implementations.read_local_file, implementations.write_local_file)
+    functions = implementations.permitted_functions()
     backend = select_backend(settings, functions)
     if backend is not None:
         return ChatDependencies(knowledge_base, None, None, None, logger, backend)
