@@ -1,123 +1,102 @@
-# 当前目录与依赖边界
+# 项目结构与依赖边界
 
-本文记录当前包结构与职责边界；第三阶段的工作流详见 [阶段说明](phase3.md)。
-新前端接入后默认入口改为 FastAPI；本页下方保留包拆分阶段的验收记录。当前网页结构与完整协议见 [前端接入说明](frontend.md)。
-核心实现位于 `src/miniagent/`；根目录 `.env`、`knowledge/`、`models/` 和 `data/` 的含义及路径保持不变。
+正式 Python 包位于 `src/miniagent/`，前端位于 `frontend/`。根目录 `.env`、`knowledge/`、`data/` 和 `models/` 保持原位置，本次没有迁移数据。
+
+## 当前目录
 
 ```text
-miniAgent2.0/
-├── pyproject.toml                 # 包元数据、资源和启动入口
-├── requirements.txt               # 依赖唯一维护清单，由 pyproject 引用
-├── frontend/                      # assistant-ui + React + TypeScript
-├── configs/                       # 预留安全与实验配置，README 说明用途
-├── migrations/                    # 预留版本化数据库迁移，本次不执行迁移
-├── src/
-│   ├── miniagent/
-│   │   ├── __main__.py            # python -m miniagent
-│   │   ├── bootstrap.py           # 依赖装配与后端选择
-│   │   ├── config.py              # 项目路径、配置、日志
-│   │   ├── contracts.py           # 请求与事件契约
-│   │   ├── application/
-│   │   │   ├── chat_service.py    # 会话、运行、SSE 事件与取消
-│   │   │   ├── chat.py            # 聊天流程、检索注入、拒答和引用校验
-│   │   │   └── documents.py       # 导入、查询、确认删除用例
-│   │   ├── knowledge/
-│   │   │   ├── rag.py             # 混合检索和原有索引/回收站逻辑
-│   │   │   ├── ingest.py          # 解析、分块、增量入库
-│   │   │   ├── rerank.py          # 原 ONNX 推理
-│   │   │   └── citations.py       # 引用原始数据序列化
-│   │   ├── memory/
-│   │   │   ├── thread_store.py    # 新界面结构化存储，旧库只读
-│   │   │   ├── memory_store.py    # 原 SQLite 存储
-│   │   │   └── context.py         # 按配置路径获取存储实例
-│   │   ├── adapters/
-│   │   │   ├── llm.py             # LangChain 实现
-│   │   │   └── legacy.py          # 延迟构造旧 SDK 后端
-│   │   ├── tools/
-│   │   │   └── implementations.py # 时间、搜索、文件工具共用函数
-│   │   ├── ui/
-│   │   │   ├── app.py             # 创建页面与启动
-│   │   │   ├── handlers.py        # Gradio 回调与返回格式适配
-│   │   │   ├── renderers.py       # HTML、引用展开、候选表
-│   │   │   └── assets/styles.css  # 页面样式
-│   │   ├── api/                   # 新主入口，FastAPI 与请求模型
-│   │   ├── cli/
-│   │   │   ├── doctor.py          # 启动自检
-│   │   │   └── setup_reranker.py  # 模型下载与校验
-│   │   ├── prompts/               # 原回答与摘要 Prompt
-│   │   ├── workflows/             # 已实现模式路由与单轮状态
-│   │   ├── security/              # 预留后续安全机制
-│   │   └── observability/         # 预留追踪和审计
-├── examples/local_model.py        # 与正式应用分开的本地调用示例
-├── tests/                         # 原测试及新增架构边界测试
-├── evaluations/                   # 实验基线与合成样例
-└── docs/                          # 架构、阶段记录和测试资料
+src/miniagent/
+├── bootstrap.py              # 入口装配模型、策略及服务
+├── runtime.py                # 请求级配置与策略，异步/线程隔离
+├── config.py                 # 配置读取；导入不初始化日志
+├── contracts.py              # ChatRequest、RunCommand 和事件
+├── api/
+│   ├── app.py                # 生命周期、中间件、路由挂载
+│   ├── mapping.py            # HTTP 请求转内部命令
+│   ├── streaming.py          # SSE 编码
+│   ├── schemas.py            # 参数校验
+│   └── routes/               # chat、threads、documents
+├── application/
+│   ├── chat_service.py       # 运行、取消、会话持久化
+│   ├── chat.py               # 公开单轮执行接口、生产安全包装
+│   ├── context.py            # 历史内容归一化
+│   ├── documents.py          # 文档管理用例
+│   └── uploads.py            # 受限上传暂存与清理
+├── knowledge/
+│   ├── rag.py                # 混合检索与重排调度，兼容原接口
+│   ├── store.py              # Chroma 延迟装配和文档事务
+│   ├── recycling.py          # 原快照、删除与回滚
+│   ├── sources.py            # 资料名规则
+│   ├── ingest.py             # 增量入库和原文版本
+│   ├── parsing.py            # 文本/PDF 解析和分块
+│   ├── rerank.py             # ONNX 原推理
+│   └── citations.py          # 引用数据
+├── security/
+│   ├── policy.py             # 权限策略、配置加载、兼容接口
+│   ├── injection.py          # 规则检测
+│   ├── admission.py          # 入库检查
+│   ├── context.py            # 片段审查
+│   └── output.py             # 完整审核后发布
+├── observability/
+│   ├── logging.py            # 启动时日志装配
+│   ├── decisions.py          # 安全决策的日志/审计/统计出口
+│   ├── audit.py              # 独立本地审计
+│   ├── tracing.py            # 脱敏摘要
+│   └── langsmith.py          # 显式摘要导出
+├── experiments/
+│   ├── rules.py              # 规则基线
+│   ├── matrix.py             # 对照、消融、评分
+│   └── compare.py            # 比较与统计导出
+├── adapters/                 # LangChain、旧 SDK
+├── workflows/                # LangGraph
+├── tools/                    # 工具与知识库会话
+├── memory/                   # SQLite
+├── prompts/
+├── cli/
+└── ui/                       # 迁移期间保留 Gradio
 ```
+
+前端 `App.tsx` 负责布局，`components/SettingsPanel.tsx` 和 `components/SourcesPanel.tsx` 分别负责设置和来源展示；`Chat.tsx` 保留 assistant-ui 适配，`useChat.ts` 保留共同的会话/运行生命周期。
+
+根目录 `evaluations/` 保存数据集、原基线及薄入口；实验实现只保存在包内。旧命令继续有效，CLI 不再用 runpy 执行测试实现。
 
 ## 调用方向
 
-```text
-启动命令 → api.app → application.chat_service → application.chat
-React 页面 → HTTP / SSE ↗                 ↓
-旧 Gradio → ui.handlers → application.chat / documents
-                                      ↓
-                         bootstrap 注入模型、工具、知识库
-                                      ↓
-                         knowledge / adapters / memory
+```mermaid
+flowchart TD
+    UI[React / assistant-ui] --> API[FastAPI routes]
+    API --> Command[HTTP 转 RunCommand]
+    Command --> Service[ChatService]
+    Boot[bootstrap 装配配置与依赖] --> Service
+    Service --> Chat[公开单轮流程]
+    Chat --> Graph[LangGraph]
+    Graph --> Model[LangChain / 旧 SDK]
+    Graph --> RAG[原知识库检索]
+    Chat --> Guard[输出门禁]
+    Guard --> Trace[脱敏摘要]
+    Service --> Store[SQLite]
 ```
 
-顶层旧兼容脚本已移除，`src/` 中的正式源码统一位于 `miniagent/`。
-页面通过 `create_app()` 或 `launch()` 创建；测试使用回调模块的延迟页面接口。
-聊天历史在页面加载或用户操作时读取，而不是导入模块时打开数据库。
-界面层处理 Gradio 控件，应用层返回普通数据，展示层只负责渲染。
+- ChatService 不导入 bootstrap，也不读取 Pydantic options；依赖工厂由入口注入。
+- RuntimeEnvironment 显式绑定配置和策略。安全检查、工具、输出密钥检查、追踪与审计采用相同请求环境；异步任务与检索线程继承环境，退出即还原。
+- FastAPI 默认知识库明确接收 embedding 模型、Ollama 地址及策略；显式传入实例时保留该实例，调用者负责其存储配置。
+- 生产 stream_chat 固定启用工作流和输出审核；实验使用公开 execute_chat/stream_pipeline 组装，防护选项没有进入 HTTP schema。
+- LangChain 模型构造支持 model_factory，实验无需替换模块全局函数。正式矩阵不再依赖 unittest.mock 或私有执行函数。
+- 原历史固定输出脚本 evaluations/baseline.py 仍可使用 mock；它是兼容性测试，不是正式矩阵核心。
+- KnowledgeBase 的存储与回收通过内部 mixin 共享原 collection 和锁；document_transaction、snapshot 提供公开边界，不复制索引或事务。
+- 保留必要兼容导出：ingest 的解析函数、rag 的知识库接口、policy 的安全接口及 chat 的文本归一化函数。
 
-原 Chroma/BM25/ONNX 算法没有重写。`rag.py` 仍有原有索引和文档回收实现，后续有真实需求时再抽存储接口，避免本次引入第二套存储实现。
-引用数据直接使用 `knowledge.citations`，界面展示直接使用 `ui.renderers`；检索模块不再反向导入界面。
-第四阶段已实现规则策略、检索过滤、工具白名单和输出门禁，详见 [安全基础层说明](phase4.md)。第五阶段在 observability 中实现本地统计摘要和显式 LangSmith 摘要导出，详见 [追踪与评测](phase5.md)；尚未实现完整调用树、人工审批或多用户权限。
+不为每个函数增加 Repository/Factory 转发层。ONNX、SQLite、LangChain/LangGraph 循环和前端 useChat 生命周期保留，避免把共同状态拆成难以协调的对象。
 
-## 安装与启动
+## 运行与兼容
 
-所有 Python 安装均使用用户指定的 `miniAgent2.0` 环境。包拆分阶段只注册了可编辑包；新前端另需按接入说明构建：
+`python -m miniagent` 仍访问 8000；旧界面 `miniagent-gradio` 使用 7860。共用知识库时不要同时执行文档变更。HTTP URL、collection、分块 profile、回收快照和 SQLite 表结构不变。
 
 ```powershell
 conda activate miniAgent2.0
-python -m pip install --no-deps --no-build-isolation -e .
 python -m miniagent
+python evaluations/security.py --output-dir D:/miniAgent2.0-experiments/phase6
+python -m miniagent.cli.evaluate run --output-dir D:/miniAgent2.0-experiments/rules
 ```
 
-旧 `python src/knowledge_assistant.py` 命令已移除。命令行自检、导入和模型准备：
-
-```powershell
-python -m miniagent.cli.doctor
-python -m miniagent.knowledge.ingest "资料路径.md"
-python -m miniagent.cli.setup_reranker
-```
-
-可编辑安装只在指定环境登记源码位置，不移动源码、个人资料或数据库，不修改全局解释器。
-当前配置仍以源码项目根目录为基准，主要面向源码运行和可编辑安装；不承诺安装 wheel 后自动携带个人数据。
-
-## 验收资料和范围
-
-- 完整回归使用原六份虚构文档、七天更新为九天的版本样例、固定时钟、合成注入和正常教学内容。
-- 包边界测试检查单一包布局、原数据根目录及导入时不创建界面/聊天库。
-- 网页回归使用隔离的“冷却液每九天更换”手册，验证回答、引用、候选表、无依据拒答和消息持久化。
-- 文档管理回归只用隔离的“删除测试.md”，验证确认、回收站和列表刷新。
-- 真实模型网页检查继续使用原 DeepSeek 服务、Ollama BGE-M3 与 ONNX；不使用用户正式资料。
-
-测试日志保存在 `D:\miniAgent2.0-experiments\phase2/layout-*.txt`；原脚本的临时库沿用项目 `.cache/`。
-
-本次结果：52 项完整测试全部通过；聊天及文档管理网页接口通过；真实 DeepSeek + Ollama + ONNX 网页问答通过。
-对比迁移前后的基线，30 条检索排名、四种聊天结果和八条持久化消息一致；实现文件路径与导入发生变化，因此不要求源码哈希相同。
-`pip check` 和 Python 语法检查通过。未下载新的第三方依赖，项目可编辑注册仅写入用户指定的 `miniAgent2.0` 环境。
-
-## 遗留文件清理
-
-已移除 `src/` 顶层的十二个兼容转发模块，测试和评估脚本统一使用 `miniagent.*`。
-原 `src/local.py` 移至 `examples/local_model.py`，独立示例保留，正式启动统一使用 `python -m miniagent`。
-检索模块中反向转发到界面的函数也已移除，引用序列化与 HTML 展示各自保持单一实现。
-`src/prompts/` 已为空；实际模板位于 `src/miniagent/prompts/`。删除本机空目录的操作被自动审批策略拒绝，空壳暂留且不会进入 Git。
-顶层 `src/__pycache__/` 是已有的忽略缓存，不属于发布源码，本次保留。预留的安全、工作流等包按规划保留。
-
-清理后使用原六份合成资料、固定时钟和注入样例完成 52 项回归，全部通过；固定回答聊天接口和隔离文档管理接口也通过。
-本次未额外调用真实 DeepSeek 生成请求，未下载依赖、修改正式知识库或历史数据。
-日志与基线位于 `D:\miniAgent2.0-experiments\phase2/cleanup-tests.txt` 和 `cleanup-baseline/`。
+本次没有安装新依赖，无需重新注册可编辑包；前端已构建。验收资料、结果与路径见 [重构验收](refactor.md)。历史 phase1–phase6 文档保留，旧目录示意以本页为准。

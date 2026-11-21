@@ -1,22 +1,20 @@
 """Local embeddings through Ollama and a persistent Chroma knowledge base."""
 from __future__ import annotations
 
-import json
 import math
-import os
-from datetime import datetime, timezone
 from pathlib import Path
 import re
 import threading
-import uuid
+import copy
 
-import chromadb
-from chromadb.config import Settings
 import httpx
 import jieba
 from rank_bm25 import BM25Plus
 from miniagent.config import settings, logger
 from miniagent.security.policy import get_policy
+from miniagent.knowledge.sources import SUPPORTED_EXTENSIONS, validate_source
+from miniagent.knowledge.recycling import RecyclingMixin
+from miniagent.knowledge.store import ChromaStoreMixin
 
 # 检索分三阶段：两路召回 → RRF 融合 → 可选重排与阈值过滤。
 
@@ -24,7 +22,6 @@ from miniagent.security.policy import get_policy
 PROJECT_DIR = settings.project_dir
 KNOWLEDGE_DIR = settings.knowledge_dir
 CHROMA_DIR = settings.chroma_dir
-SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf"}
 RRF_K = 60  # 融合只使用各通道名次，避免直接相加不同尺度的原始分数。
 DEFAULT_RERANK_THRESHOLD = 0.2  # 合成校准集的初始工作点；真实资料仍需调参，不代表正确率。
 _tokenizer = jieba.Tokenizer()
@@ -49,7 +46,7 @@ def tokenize(text: str) -> list[str]:
     return tokens
 
 
-class KnowledgeBase:
+class KnowledgeBase(ChromaStoreMixin, RecyclingMixin):
     def __init__(self, db_path=None, knowledge_dir=None, model=None, ollama_url=None, security_policy=None):
         self.knowledge_dir = Path(knowledge_dir or KNOWLEDGE_DIR).resolve()
         self.db_path = Path(db_path or CHROMA_DIR).resolve()
@@ -60,24 +57,6 @@ class KnowledgeBase:
         self._client = None
         self._bm25_cache = None
         self.security_policy = security_policy if security_policy is not None else get_policy()
-
-    @property
-    def collection(self):
-        with self._lock:
-            if self._collection is None:
-                self.db_path.mkdir(parents=True, exist_ok=True)
-                self._client = chromadb.PersistentClient(
-                    path=str(self.db_path), settings=Settings(anonymized_telemetry=False)
-                )
-                collection = self._client.get_or_create_collection(
-                    name="documents_v1", embedding_function=None,
-                    metadata={"embedding_model": self.model, "pipeline_version": "1"},
-                    configuration={"hnsw": {"space": "cosine"}},
-                )
-                if collection.metadata.get("embedding_model") != self.model:
-                    raise ValueError("向量库使用了其他 embedding 模型，请使用独立的新向量库目录。")
-                self._collection = collection
-            return self._collection
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """串行调用本地 Ollama；过长输入报错，不静默截断后再生成向量。"""
@@ -110,6 +89,13 @@ class KnowledgeBase:
         """资料变化后清除内存 BM25 索引，下次检索再从最新文本构建。"""
         with self._lock:
             self._bm25_cache = None
+
+    def with_policy(self, policy):
+        """共享只读 collection 与锁，策略和关键词缓存独立，实验不修改原实例。"""
+        scoped = copy.copy(self)
+        scoped.security_policy = policy
+        scoped._bm25_cache = None
+        return scoped
 
     def _lexical_index(self):
         if self._bm25_cache is None:
@@ -226,19 +212,18 @@ class KnowledgeBase:
                 "threshold": threshold if use_rerank else None,
                 "use_rerank": use_rerank}
 
+    def snapshot(self):
+        """在同一把锁下取得清单和状态，应用层不再读取私有锁。"""
+        with self._lock:
+            return self.list_documents(), self.status()
+
     def status(self) -> str:
         with self._lock:
             result = self.collection.get(include=["metadatas"])
         sources = sorted({m["source"] for m in result["metadatas"]})
         return f"知识库：{len(sources)} 个文档，{len(result['ids'])} 个文本块。\n" + "\n".join(sources)
 
-    @staticmethod
-    def _validate_source(source: str):
-        """删除只接受资料文件名，不接受路径、Windows 流名称或特殊目录。"""
-        if (not isinstance(source, str) or not source or source in {".", ".."}
-                or re.search(r'[<>:"/\\|?*\x00-\x1f]', source)
-                or source.endswith((" ", ".")) or Path(source).suffix.lower() not in SUPPORTED_EXTENSIONS):
-            raise ValueError("非法资料文件名；只能删除知识库列表中的文档。")
+    _validate_source = staticmethod(validate_source)
 
     def list_documents(self) -> list[dict]:
         """合并向量库与原文件清单，原文缺失或尚未索引的文件也能显示。"""
@@ -256,87 +241,7 @@ class KnowledgeBase:
                      "has_file": (self.knowledge_dir / name).is_file()}
                     for name, count in sorted(counts.items())]
 
-    def delete_document(self, source: str) -> dict:
-        """从检索库移除文档，原文与索引快照保留在回收站，失败时尽量回滚。"""
-        self._validate_source(source)
-        with self._lock:
-            if source not in {row["source"] for row in self.list_documents()}:
-                raise ValueError("该文档已不在知识库列表中，请刷新后重试。")
-            original = self.knowledge_dir / source
-            # 禁止通过链接或目录跳转移动知识库外部的文件。
-            if original.is_symlink() or original.resolve() != original or (original.exists() and not original.is_file()):
-                raise ValueError("原文件路径异常，未执行删除。")
-            trash_root = self.db_path.parent / "trash"
-            if trash_root.resolve() != trash_root or trash_root.is_symlink():
-                raise ValueError("回收站路径异常，未执行删除。")
-            trash_root.mkdir(parents=True, exist_ok=True)
-            batch = trash_root / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex)
-            batch.mkdir()
-            # Chroma 与文件系统没有跨库事务；先持久化完整快照，确保异常时仍有恢复材料。
-            snapshot = self.collection.get(where={"source": source},
-                                           include=["documents", "metadatas", "embeddings"])
-            vectors = snapshot["embeddings"]
-            snapshot_data = {"ids": snapshot["ids"], "documents": snapshot["documents"],
-                             "metadatas": snapshot["metadatas"],
-                             "embeddings": vectors.tolist() if hasattr(vectors, "tolist") else vectors}
-            record = {"source": source, "state": "prepared", "original_path": str(original),
-                      "chunk_count": len(snapshot["ids"]), "snapshot": snapshot_data}
-            manifest = batch / "manifest.json"
 
-            def save_record():
-                temporary = batch / "manifest.json.tmp"
-                temporary.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
-                os.replace(temporary, manifest)
-
-            save_record()
-            recycled = batch / source
-            moved = False
-            db_attempted = False
-            try:
-                # 先移动原文；若文件被占用，数据库仍保持原样。
-                if original.exists():
-                    original.rename(recycled)
-                    moved = True
-                self.invalidate_lexical_index()
-                if snapshot["ids"]:
-                    db_attempted = True
-                    self.collection.delete(ids=snapshot["ids"])
-                    if self.collection.get(where={"source": source}, include=[])["ids"]:
-                        raise RuntimeError("向量库仍存在该文档的记录。")
-                record["state"] = "deleted"
-                save_record()
-            except Exception as error:
-                logger.error("文档删除失败，开始回滚，类型=%s", type(error).__name__)
-                # 删除调用可能已经部分生效，因此只要尝试过就恢复快照；BM25 下次读取最新库。
-                rollback_errors = []
-                if db_attempted:
-                    try:
-                        for start in range(0, len(snapshot["ids"]), 64):
-                            self.collection.upsert(**{key: value[start:start + 64]
-                                for key, value in snapshot_data.items()})
-                    except Exception as rollback_error:
-                        rollback_errors.append(f"索引恢复失败：{rollback_error}")
-                if moved:
-                    try:
-                        if original.exists():
-                            raise RuntimeError("原路径已被占用，保留回收站原文，避免覆盖。")
-                        recycled.rename(original)
-                    except Exception as rollback_error:
-                        rollback_errors.append(f"原文恢复失败：{rollback_error}")
-                self.invalidate_lexical_index()
-                record["state"] = "rollback_failed" if rollback_errors else "rolled_back"
-                record["error"] = str(error)
-                record["rollback_errors"] = rollback_errors
-                try:
-                    save_record()
-                except Exception as record_error:
-                    rollback_errors.append(f"状态写入失败：{record_error}")
-                detail = "；".join(rollback_errors) if rollback_errors else "原文与索引已恢复"
-                logger.warning("删除回滚结果=%s", record["state"])
-                raise RuntimeError(f"删除失败：{error}；{detail}。恢复材料：{batch}") from error
-            logger.info("文档删除完成，移除块数=%d，原文件回收=%s", len(snapshot["ids"]), moved)
-            return {"source": source, "chunk_count": len(snapshot["ids"]),
-                    "file_recycled": moved, "trash_path": str(batch)}
 
 
 def select_context(candidates: list[dict], top_k: int, max_chars: int = 12000) -> list[dict]:

@@ -4,6 +4,7 @@ import asyncio
 import re
 
 from miniagent.config import settings
+from miniagent.runtime import current_config
 from miniagent.security.policy import audit
 
 
@@ -24,7 +25,7 @@ def output_findings(text, secrets=()):
 
 async def guarded_events(events, secrets=None):
     """正文和推理都不在终态审核前释放；进度及工具事件仍可实时传递。"""
-    secrets = secrets if secrets is not None else (settings.openai_api_key, settings.tavily_api_key, settings.langsmith_api_key)
+    secrets = secrets if secrets is not None else (current_config(settings).openai_api_key, current_config(settings).tavily_api_key, current_config(settings).langsmith_api_key)
     async for event in events:
         terminal = event.kind in {"complete", "refusal", "error"}
         if event.kind == "error":

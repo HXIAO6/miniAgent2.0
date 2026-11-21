@@ -49,6 +49,15 @@ class ChatDependencies:
     logger: object
     # 未指定时运行原 SDK；由界面入口显式选择新适配器，旧测试与调用方式继续兼容。
     backend: object = None
+    environment: object = None
+
+
+@dataclass(frozen=True)
+class RunCommand:
+    """内部运行命令；应用服务不依赖 FastAPI/Pydantic 请求对象。"""
+
+    run_id: str
+    request: ChatRequest
 
 
 @dataclass(frozen=True)

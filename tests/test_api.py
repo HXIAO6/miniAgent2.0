@@ -12,6 +12,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from miniagent.api.app import create_app
 from miniagent.api.schemas import RunRequest
+from miniagent.api.mapping import run_command
 from miniagent.application.chat_service import ChatService
 from miniagent.config import settings
 from miniagent.contracts import ChatEvent
@@ -99,7 +100,7 @@ class CancellationTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(60)
         lock = asyncio.Lock()
         service = ChatService(settings, None, store, lock, executor=executor, dependency_factory=lambda: None)
-        run_id, queue = await service.start(thread, RunRequest(message="合成问题", run_id=uuid.uuid4()))
+        run_id, queue = await service.start(thread, run_command(RunRequest(message="合成问题", run_id=uuid.uuid4())))
         await produced.wait()
         await service.cancel(run_id)
         self.assertFalse(lock.locked())
@@ -124,7 +125,7 @@ class CancellationTests(unittest.IsolatedAsyncioTestCase):
         lock = asyncio.Lock()
         service = ChatService(settings, None, store, lock, executor=executor, dependency_factory=lambda: None)
         for index in range(2):
-            run_id, queue = await service.start(thread, RunRequest(message=f"合成问题{index}", run_id=uuid.uuid4()))
+            run_id, queue = await service.start(thread, run_command(RunRequest(message=f"合成问题{index}", run_id=uuid.uuid4())))
             events = [event async for event in service.events(run_id, queue) if event]
             self.assertNotIn("secret-token", json.dumps(events))
             self.assertFalse(lock.locked())
@@ -143,10 +144,10 @@ class CancellationTests(unittest.IsolatedAsyncioTestCase):
             yield ChatEvent(kind="complete", history=[], answer="不会完成")
         lock = asyncio.Lock()
         service = ChatService(settings, None, store, lock, executor=executor, dependency_factory=lambda: None)
-        run_id, queue = await service.start(thread, RunRequest(message="取消测试", run_id=uuid.uuid4()))
+        run_id, queue = await service.start(thread, run_command(RunRequest(message="取消测试", run_id=uuid.uuid4())))
         from miniagent.application.chat_service import BusyError
         with self.assertRaises(BusyError):
-            await service.start(thread, RunRequest(message="并行测试", run_id=uuid.uuid4()))
+            await service.start(thread, run_command(RunRequest(message="并行测试", run_id=uuid.uuid4())))
         await service.cancel(run_id)
         self.assertFalse(lock.locked())
         self.assertEqual(store.get_run(run_id)["status"], "cancelled")

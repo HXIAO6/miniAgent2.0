@@ -1,5 +1,5 @@
 """复用原有检索的聊天服务：选择模型后端并输出统一事件，不创建界面。"""
-import ast
+from miniagent.application.context import message_content_to_text
 import asyncio
 import copy
 import time
@@ -9,27 +9,7 @@ from miniagent.knowledge.citations import evidence_json
 from miniagent.security.policy import get_policy
 from miniagent.security.output import guarded_events
 from miniagent.observability.tracing import observed_events
-
-
-def message_content_to_text(content):
-    """把字符串、字典或 Gradio 文本块列表统一转换成普通字符串。"""
-    if isinstance(content, str):
-        stripped = content.strip()
-        if stripped.startswith("[") and "'text'" in stripped:
-            try:
-                return message_content_to_text(ast.literal_eval(stripped))
-            except (SyntaxError, ValueError):
-                pass
-        return content
-    if isinstance(content, dict):
-        if isinstance(content.get("text"), str):
-            return message_content_to_text(content["text"])
-        if isinstance(content.get("content"), str):
-            return message_content_to_text(content["content"])
-        return ""
-    if isinstance(content, (list, tuple)):
-        return "".join(message_content_to_text(item) for item in content)
-    return str(content) if content is not None else ""
+from miniagent.runtime import scoped_events
 
 
 async def model_events(messages, dependencies, strict):
@@ -58,10 +38,23 @@ async def model_events(messages, dependencies, strict):
 
 
 async def stream_chat(request: ChatRequest, dependencies: ChatDependencies):
+    """生产入口固定启用工作流和输出审核；实验选项只由独立实验进程使用。"""
+    async for event in stream_pipeline(request, dependencies):
+        yield event
+
+
+async def stream_pipeline(request, dependencies, *, use_graph=True, review_output=True):
     """统一经过应用图路由，原执行函数继续负责回答和持久化标记。"""
     from miniagent.workflows.chat_graph import stream_workflow
     try:
-        async for event in observed_events(guarded_events(stream_workflow(request, dependencies, _execute_chat)), request):
+        events = stream_workflow(request, dependencies, execute_chat) if use_graph else execute_chat(request, dependencies)
+        if review_output:
+            events = guarded_events(events)
+        config = dependencies.environment.config if dependencies.environment is not None else None
+        events = observed_events(events, request, config)
+        if dependencies.environment is not None:
+            events = scoped_events(events, dependencies.environment)
+        async for event in events:
             yield event
     except Exception as error:
         dependencies.logger.error("工作流失败，类型=%s", type(error).__name__)
@@ -70,7 +63,7 @@ async def stream_chat(request: ChatRequest, dependencies: ChatDependencies):
                         answer="运行失败，请检查服务状态后重试。", update_scores=True, persist=True)
 
 
-async def _execute_chat(request: ChatRequest, dependencies: ChatDependencies):
+async def execute_chat(request: ChatRequest, dependencies: ChatDependencies):
     """保持既有检索与引用行为，模型接入通过依赖选择。"""
     history = request.history or []
     message = request.message

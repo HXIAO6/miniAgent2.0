@@ -46,9 +46,14 @@ def build_model(settings, model_name):
 class LangChainBackend:
     """普通 Agent 使用框架的工具循环；严格问答直接调用无工具模型。"""
 
-    def __init__(self, settings, tool_functions=()):
+    def __init__(self, settings, tool_functions=(), model_factory=None):
         self.settings = settings
         self.tool_functions = tool_functions
+        self.model_factory = model_factory
+
+    def model(self, name):
+        """模型构造是可注入边界，实验统计不再替换模块函数。"""
+        return (self.model_factory or build_model)(self.settings, name)
 
     async def compress_history(self, messages):
         """沿用 30/8 条压缩策略，但摘要保留为历史数据，不提升为系统指令。"""
@@ -60,7 +65,7 @@ class LangChainBackend:
         history_text = "\n".join(f"{message['role']}: {message['content']}" for message in old_messages)
         # 第二阶段尚未启用远程追踪，防止个人原文因环境中的追踪设置而自动上传。
         with tracing_context(enabled=False):
-            model = build_model(self.settings, self.settings.summary_model)
+            model = self.model(self.settings.summary_model)
             summary = await model.ainvoke([
                 {"role": "system", "content": load_prompt("summarize")},
                 {"role": "user", "content": "请压缩以下对话：\n" + history_text},
@@ -74,7 +79,7 @@ class LangChainBackend:
         """将模型文本和工具状态转换为统一事件；取消与请求错误由上层处理。"""
         from langsmith import tracing_context
         with tracing_context(enabled=False):
-            model = build_model(self.settings, self.settings.chat_model)
+            model = self.model(self.settings.chat_model)
             instructions = load_prompt("answer") + extra_instructions
             if strict or (not self.tool_functions and not tools):
                 # 不绑定工具是程序级限制，不依赖模型承诺不调用工具。

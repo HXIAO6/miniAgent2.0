@@ -8,6 +8,7 @@ import time
 import uuid
 
 from miniagent.config import logger, settings
+from miniagent.runtime import current_config
 
 _current = ContextVar("miniagent_trace", default=None)
 TOOLS = {"get_current_time", "search_knowledge", "search_web", "read_local_file", "write_local_file"}
@@ -33,7 +34,7 @@ def _write(record, directory):
 
 async def observed_events(events, request, config=None):
     """包裹真实应用事件；正常、失败、取消均收尾，追踪写入失败不破坏聊天。"""
-    config = config or settings
+    config = config or current_config(settings)
     if not config.trace_enabled:
         async for event in events:
             yield event

@@ -89,7 +89,8 @@ def launch():
     """统一启动入口，自检不改变现有知识库或模型配置。"""
     import gradio as gr
     from miniagent.cli.doctor import run_startup_checks, format_startup_checks
-    from miniagent.config import logger
+    from miniagent.config import logger, configure_logging
+    configure_logging(settings)
     css = (Path(__file__).parent / "assets" / "styles.css").read_text(encoding="utf-8")
     logger.info("\n%s", format_startup_checks(run_startup_checks()))
     demo = create_app()

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -55,6 +54,9 @@ class Settings:
     # 应用自定义摘要追踪，框架的原始 Prompt 自动追踪继续关闭。
     trace_enabled: bool = _bool("MINIAGENT_TRACE_ENABLED", True)
     trace_dir: Path = _path("MINIAGENT_TRACE_DIR", PROJECT_DIR / "data" / "traces")
+    # 安全审计独立保存，不依赖运行摘要是否开启，不向 LangSmith 导出。
+    audit_enabled: bool = _bool("MINIAGENT_AUDIT_ENABLED", True)
+    audit_dir: Path = _path("MINIAGENT_AUDIT_DIR", PROJECT_DIR / "data" / "audit")
     langsmith_export_enabled: bool = _bool("MINIAGENT_LANGSMITH_EXPORT", False)
     langsmith_api_key: str = field(default=os.getenv("LANGSMITH_API_KEY", ""), repr=False)
     langsmith_endpoint: str = os.getenv("MINIAGENT_LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
@@ -68,23 +70,10 @@ class Settings:
 settings = Settings()
 
 
-def configure_logging() -> logging.Logger:
-    """同时写滚动文件和控制台；日志不记录问题正文、密钥或检索原文。"""
-    settings.log_file.parent.mkdir(parents=True, exist_ok=True)
-    logger = logging.getLogger("miniagent")
-    if logger.handlers:
-        return logger
-    logger.setLevel(getattr(logging, settings.log_level, logging.INFO))
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-    file_handler = RotatingFileHandler(settings.log_file, maxBytes=5 * 1024 * 1024,
-                                       backupCount=3, encoding="utf-8")
-    file_handler.setFormatter(formatter)
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    logger.propagate = False
-    return logger
+logger = logging.getLogger("miniagent")
 
 
-logger = configure_logging()
+def configure_logging(config=None):
+    """兼容原入口，实际日志装配独立于配置定义。"""
+    from miniagent.observability.logging import configure_logging as initialize
+    return initialize(config)

@@ -1,9 +1,9 @@
 """统一会话与运行服务；HTTP 只消费结构化事件，不管理模型上下文或存储格式。"""
 import asyncio
 from miniagent.application.chat import stream_chat
-from miniagent.bootstrap import build_chat_dependencies
 from miniagent.config import logger
-from miniagent.contracts import ChatRequest
+from miniagent.contracts import RunCommand
+from dataclasses import replace
 
 
 class BusyError(Exception):
@@ -19,10 +19,12 @@ class ChatService:
         self.store = store
         self.lock = operation_lock
         self.executor = executor
-        self.dependency_factory = dependency_factory or (lambda: build_chat_dependencies(settings, knowledge_base, logger))
+        if dependency_factory is None:
+            raise ValueError("请通过 bootstrap 装配聊天依赖，或显式注入 dependency_factory。")
+        self.dependency_factory = dependency_factory
         self.active = {}
 
-    async def start(self, thread_id, payload):
+    async def start(self, thread_id, payload: RunCommand):
         if self.lock.locked():
             raise BusyError("另一个操作正在执行，请稍后重试。")
         rows = self.store.messages(thread_id)
@@ -34,17 +36,12 @@ class ChatService:
         await self.lock.acquire()
         run_id = str(payload.run_id)
         try:
-            message_id = self.store.start_run(thread_id, run_id, payload.message)
+            message_id = self.store.start_run(thread_id, run_id, payload.request.message)
         except BaseException:
             self.lock.release()
             raise
         queue = asyncio.Queue(maxsize=256)
-        options = payload.options
-        request = ChatRequest(message=payload.message, history=history,
-            use_knowledge=options.mode != "chat", only_knowledge=options.only_knowledge,
-            knowledge_mode="auto" if options.mode == "auto" else "forced",
-            top_k=options.top_k, candidate_k=options.candidate_k, retrieval_mode=options.retrieval_mode,
-            use_rerank=options.use_rerank, rerank_threshold=options.rerank_threshold, rerank_k=options.rerank_k)
+        request = replace(payload.request, history=history)
         task = asyncio.create_task(self._produce(thread_id, run_id, message_id, request, queue))
         self.active[run_id] = task
         # 让生产任务先进入 try/finally，立即点击停止也能释放操作锁并写入终态。

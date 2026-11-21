@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "dataset": "evaluations/datasets/phase6_agent.json",
+  "repetitions": 1,
+  "retrieval": {"top_k": 1, "candidate_k": 20, "mode": "hybrid", "use_rerank": true, "threshold": 0.2},
+  "prices_per_million_tokens": {"input": null, "output": null, "currency": "unspecified"},
+  "variants": [
+    {"id": "original_rag_reconstructed", "graph": false, "backend": "legacy", "permissions": false, "injection": false, "output": false},
+    {"id": "framework_only", "graph": true, "backend": "langchain", "permissions": false, "injection": false, "output": false},
+    {"id": "permissions_only", "graph": true, "backend": "langchain", "permissions": true, "injection": false, "output": false},
+    {"id": "full", "graph": true, "backend": "langchain", "permissions": true, "injection": true, "output": true},
+    {"id": "without_permissions", "graph": true, "backend": "langchain", "permissions": false, "injection": true, "output": true},
+    {"id": "without_injection", "graph": true, "backend": "langchain", "permissions": true, "injection": false, "output": true},
+    {"id": "without_output", "graph": true, "backend": "langchain", "permissions": true, "injection": true, "output": false}
+  ]
+}

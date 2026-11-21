@@ -3,13 +3,16 @@ import asyncio
 from pathlib import Path
 from miniagent.config import logger
 from miniagent.knowledge.ingest import ingest_file
+from miniagent.runtime import bind_environment
+from contextlib import nullcontext
 
 
 class DocumentService:
     """复用既有入库、锁和回收站，数据位置和删除协议保持不变。"""
 
-    def __init__(self, knowledge_base):
+    def __init__(self, knowledge_base, environment=None):
         self.knowledge_base = knowledge_base
+        self.environment = environment
 
     async def upload(self, files, chunk_chars=1200, overlap_chars=180):
         """显式注入知识库，避免默认全局实例绕开隔离测试上下文。"""
@@ -19,7 +22,9 @@ class DocumentService:
             results = []
             for path in files:
                 try:
-                    results.append(ingest_file(path, self.knowledge_base, chunk_chars, overlap_chars))
+                    # 在线程中显式绑定同一份服务端配置，审计和密钥检查不会回落到默认实例。
+                    with bind_environment(self.environment) if self.environment is not None else nullcontext():
+                        results.append(ingest_file(path, self.knowledge_base, chunk_chars, overlap_chars))
                     logger.info("文档导入完成")
                 except Exception as error:
                     logger.error("文档导入失败，类型=%s", type(error).__name__)
@@ -28,10 +33,7 @@ class DocumentService:
         return await asyncio.to_thread(import_all)
 
     async def snapshot(self):
-        def read():
-            with self.knowledge_base._lock:
-                return self.knowledge_base.list_documents(), self.knowledge_base.status()
-        return await asyncio.to_thread(read)
+        return await asyncio.to_thread(self.knowledge_base.snapshot)
 
     async def delete(self, sources, confirmed=False):
         """业务层再次检查确认，避免其他入口直接绕过网页确认。"""

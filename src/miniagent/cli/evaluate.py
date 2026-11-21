@@ -4,7 +4,6 @@ import hashlib
 from importlib.metadata import version
 import json
 from pathlib import Path
-import runpy
 import subprocess
 import sys
 import uuid
@@ -35,8 +34,8 @@ def run_experiment(output):
     root = settings.project_dir
     run = Path(output) / ("security-" + uuid.uuid4().hex)
     run.mkdir(parents=True)
-    module = runpy.run_path(str(root / "tests" / "evaluate_security.py"), run_name="miniagent_security_evaluation")
-    report = module["evaluate"](run)
+    from miniagent.experiments.rules import evaluate
+    report = evaluate(run)
     files = [(str(path.relative_to(root)), path) for path in (root / "src" / "miniagent").rglob("*.py")]
     files += [(name, root / name) for name in ("tests/evaluate_security.py", "requirements.txt", "configs/security.json")]
     try:

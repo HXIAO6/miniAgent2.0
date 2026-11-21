@@ -211,6 +211,7 @@ miniAgent2.0/
 ```
 
 详细依赖边界、迁移映射和启动方式见 [架构说明](docs/architecture.md)。
+最新模块拆分与配置隔离验收见 [重构记录](docs/refactor.md)，历史目录示意以架构说明为准。
 
 激活指定的 Conda 环境后，可编辑安装项目并使用包入口（不会移动知识库）：
 
@@ -230,6 +231,7 @@ python -m miniagent
 新前端、ChatService、接口协议与测试材料见 [前端接入说明](docs/frontend.md)。
 第四阶段的安全边界、默认工具权限、对照实验和已知漏检见 [安全基础层说明](docs/phase4.md)。
 第五阶段增加本地脱敏运行摘要、可选 LangSmith 手动导出与实验版本比较，见 [追踪与评测说明](docs/phase5.md)。
+按原六阶段计划补齐的七组对照、消融实验、独立安全审计和统计导出见 [第六阶段实验平台](docs/phase6.md)。历史阶段编号差异在该文档中说明。
 测试资料全文、问题及安全样例见 [合成资料说明](docs/synthetic-data.md)。
 
 离线单元测试与 GitHub Actions 使用相同方式，不调用 Ollama 或生成模型服务；本地存在重排模型时仍会运行真实 ONNX 测试：
