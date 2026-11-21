@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from rag import KnowledgeBase
+from miniagent.knowledge.rag import KnowledgeBase
 
 
 class DocumentDeletionTests(unittest.TestCase):
@@ -106,7 +106,7 @@ class DocumentDeletionTests(unittest.TestCase):
         self.assertEqual(self.kb.collection.count(), 3)
 
     def test_ui_requires_confirmation_and_resets_it_on_selection_change(self):
-        import knowledge_assistant as app
+        from miniagent.ui import handlers as app
         with patch.object(app, "knowledge_base", self.kb):
             result = asyncio.run(app.delete_documents([self.source], False))
             self.assertIn("勾选确认", result[0])

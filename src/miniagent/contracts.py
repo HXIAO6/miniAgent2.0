@@ -36,10 +36,20 @@ class ChatEvent:
 
 @dataclass(frozen=True)
 class ChatDependencies:
-    """由入口注入旧 SDK 与检索实现，测试可替换为离线实现。"""
+    """由入口注入检索、旧 SDK 和可选新后端，测试可替换为离线实现。"""
 
     knowledge_base: object
     agent: object
     runner: object
     compress_history: object
     logger: object
+    # 未指定时运行原 SDK；由界面入口显式选择新适配器，旧测试与调用方式继续兼容。
+    backend: object = None
+
+
+@dataclass(frozen=True)
+class ModelEvent:
+    """模型适配器输出的增量，避免把 LangChain 内部对象传给界面。"""
+
+    kind: str
+    text: str

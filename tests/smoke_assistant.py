@@ -4,19 +4,24 @@ from dataclasses import replace
 from pathlib import Path
 import sys
 import tempfile
+import os
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+# 页面导入会读取聊天数据库，先指定隔离路径，不能先读正式历史再切换。
+(ROOT / ".cache").mkdir(exist_ok=True)
+SMOKE_ROOT = Path(tempfile.mkdtemp(prefix="assistant-smoke-", dir=ROOT / ".cache"))
+os.environ["MEMORY_DB_PATH"] = str(SMOKE_ROOT / "memory.sqlite3")
 import httpx
 from gradio_client import Client
-import knowledge_assistant as app
-from ingest import ingest_file
-from rag import KnowledgeBase, DEFAULT_RERANK_THRESHOLD
+from miniagent.ui import handlers as app
+from miniagent.knowledge.ingest import ingest_file
+from miniagent.knowledge.rag import KnowledgeBase, DEFAULT_RERANK_THRESHOLD
 
 
 async def main():
     (ROOT / ".cache").mkdir(exist_ok=True)
-    root = Path(tempfile.mkdtemp(prefix="assistant-smoke-", dir=ROOT / ".cache"))
+    root = SMOKE_ROOT
     kb = KnowledgeBase(root / "chroma", root / "knowledge")
     source = root / "验证维护手册.md"
     source.write_text("# 星舟设备\n星舟设备的冷却液更换周期是九天。", encoding="utf-8")

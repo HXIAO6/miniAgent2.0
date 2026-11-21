@@ -7,8 +7,9 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from ingest import ingest_file, make_chunks
-from rag import KnowledgeBase, tokenize, select_context, candidate_table
+from miniagent.knowledge.ingest import ingest_file, make_chunks
+from miniagent.knowledge.rag import KnowledgeBase, tokenize, select_context
+from miniagent.ui.renderers import candidate_table
 
 
 class HybridTests(unittest.TestCase):

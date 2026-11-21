@@ -6,9 +6,9 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from ingest import ingest_file
-from rag import KnowledgeBase, select_context
-from rerank import reranker
+from miniagent.knowledge.ingest import ingest_file
+from miniagent.knowledge.rag import KnowledgeBase, select_context
+from miniagent.knowledge.rerank import reranker
 
 
 def evidence_label(question, hit):

@@ -9,7 +9,8 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from rag import KnowledgeBase, candidate_table
+from miniagent.knowledge.rag import KnowledgeBase
+from miniagent.ui.renderers import candidate_table
 
 
 class RerankPipelineTests(unittest.TestCase):
@@ -59,12 +60,12 @@ class RerankPipelineTests(unittest.TestCase):
                 self.kb.retrieve("问题", threshold=threshold)
 
     def test_strict_mode_refuses_without_llm_or_history_compression(self):
-        import knowledge_assistant as app
+        from miniagent.ui import handlers as app
         (ROOT / ".cache").mkdir(exist_ok=True)
         root = Path(tempfile.mkdtemp(prefix="refusal-tests-", dir=ROOT / ".cache"))
         async def collect():
             return [result async for result in app.predict("无资料的问题", [], True)]
-        with patch.object(app, "settings", replace(app.settings, memory_db=root / "memory.sqlite3")), \
+        with patch.object(app, "settings", replace(app.settings, memory_db=root / "memory.sqlite3", chat_backend="openai-agents")), \
              patch.object(app.knowledge_base, "retrieve", return_value={"candidates": [], "selected": []}), \
              patch.object(app.Runner, "run_streamed") as run, \
              patch.object(app, "compress_history") as compress:

@@ -1,13 +1,10 @@
-"""下载固定版本的公开 ONNX 重排模型；只写入项目的 D 盘目录。"""
+"""下载固定版本的公开 ONNX 重排模型，只写入配置的模型目录。"""
 import hashlib
 import json
 from pathlib import Path
 
 import httpx
-if __package__:
-    from .config import settings
-else:
-    from config import settings
+from miniagent.config import settings
 
 MODEL_DIR = settings.rerank_model_dir
 REPO = "Xenova/bge-reranker-base"

@@ -7,8 +7,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from gradio_client import Client
-import knowledge_assistant as app
-from rag import KnowledgeBase
+from miniagent.ui import handlers as app
+from miniagent.knowledge.rag import KnowledgeBase
 
 
 def main():

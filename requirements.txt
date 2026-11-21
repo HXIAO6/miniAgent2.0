@@ -5,6 +5,13 @@ httpx==0.28.1
 python-dotenv>=1.0,<2
 tavily-python>=0.5,<1
 
+# LangChain model adapter; LangGraph runtime is used internally by create_agent.
+langchain==1.5.2
+langchain-openai==1.8.5
+langchain-core==1.8.4
+langgraph==1.2.24
+langsmith==0.16.0
+
 # Document ingestion and retrieval
 chromadb==1.5.9
 pypdf==7.1.0

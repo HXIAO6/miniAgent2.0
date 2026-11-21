@@ -2,13 +2,11 @@
 from __future__ import annotations
 
 import os
+from importlib.util import find_spec
 from urllib.parse import urlsplit
 import httpx
 
-if __package__:
-    from .config import settings, logger
-else:
-    from config import settings, logger
+from miniagent.config import settings, logger
 
 
 def run_startup_checks() -> list[tuple[str, bool, str]]:
@@ -27,7 +25,7 @@ def run_startup_checks() -> list[tuple[str, bool, str]]:
     rerank_model = settings.rerank_model_dir / "onnx" / "model_int8.onnx"
     tokenizer = settings.rerank_model_dir / "tokenizer.json"
     ready = rerank_model.is_file() and tokenizer.is_file()
-    checks.append(("重排模型", ready, "本地模型文件已准备" if ready else f"缺少模型，请运行 src/setup_reranker.py：{settings.rerank_model_dir}"))
+    checks.append(("重排模型", ready, "本地模型文件已准备" if ready else f"缺少模型，请运行 python -m miniagent.cli.setup_reranker：{settings.rerank_model_dir}"))
     try:
         parsed = urlsplit(settings.openai_base_url or "https://api.openai.com/v1")
         configured = parsed.scheme in {"http", "https"} and bool(parsed.hostname) and bool(settings.openai_api_key)
@@ -59,6 +57,13 @@ def run_startup_checks() -> list[tuple[str, bool, str]]:
         checks.append(("ChromaDB", False, f"本地数据库检查失败（{type(error).__name__}）。"))
     if not settings.tavily_api_key:
         checks.append(("联网搜索", True, "未配置 TAVILY_API_KEY，联网搜索不可用但不影响本地 RAG"))
+    # 这里只检查包是否可见，不初始化模型、不发送请求，也不悄悄切换后端。
+    backend_valid = settings.chat_backend in {"langchain", "openai-agents"}
+    if settings.chat_backend == "langchain":
+        backend_valid = find_spec("langchain") is not None and find_spec("langchain_openai") is not None
+    checks.append(("模型后端", backend_valid,
+                   f"当前后端：{settings.chat_backend}。" +
+                   ("依赖可用。" if backend_valid else "请检查 CHAT_BACKEND 并安装 requirements.txt 中的依赖。")))
     logger.info("启动自检完成：%s", "; ".join(f"{name}={'通过' if ok else '注意'}" for name, ok, _ in checks))
     return checks
 

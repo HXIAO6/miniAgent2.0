@@ -9,7 +9,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-PROJECT_DIR = Path(__file__).resolve().parents[1]
+# 包位于 src/miniagent；数据仍固定在原项目根目录，不随模块移动。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_DIR / ".env")
 
 
@@ -31,6 +32,10 @@ class Settings:
     rerank_model_dir: Path = _path("RAG_RERANK_MODEL_DIR", PROJECT_DIR / "models" / "bge-reranker-base")
     chat_model: str = os.getenv("CHAT_MODEL", "deepseek-flash")
     summary_model: str = os.getenv("SUMMARY_MODEL") or os.getenv("CHAT_MODEL", "deepseek-flash")
+    # 可显式切回旧 SDK；新后端失败时不自动重试另一后端，避免重复请求和工具副作用。
+    chat_backend: str = os.getenv("CHAT_BACKEND", "langchain").strip().lower()
+    model_timeout: float = float(os.getenv("MODEL_TIMEOUT", "60"))
+    model_max_retries: int = int(os.getenv("MODEL_MAX_RETRIES", "1"))
     openai_api_key: str = field(default=os.getenv("OPENAI_API_KEY", ""), repr=False)
     openai_base_url: str = os.getenv("OPENAI_BASE_URL", "")
     tavily_api_key: str = field(default=os.getenv("TAVILY_API_KEY", ""), repr=False)

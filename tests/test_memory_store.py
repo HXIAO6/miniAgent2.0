@@ -6,7 +6,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from memory_store import MemoryStore
+from miniagent.memory.memory_store import MemoryStore
 
 
 class MemoryStoreTests(unittest.TestCase):

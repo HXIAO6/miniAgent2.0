@@ -10,9 +10,10 @@ from unittest.mock import AsyncMock, Mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
-from chat_service import stream_chat
-from contracts import ChatDependencies, ChatRequest
-from rag import evidence_json, source_footer
+from miniagent.application.chat import stream_chat
+from miniagent.contracts import ChatDependencies, ChatRequest
+from miniagent.knowledge.citations import evidence_json
+from miniagent.ui.renderers import source_footer
 
 
 class SecurityBoundaryTests(unittest.TestCase):

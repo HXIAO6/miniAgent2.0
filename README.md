@@ -2,7 +2,7 @@
 
 基于 Python 的个人知识库助手，具备基础 RAG、流式对话和部分 Agent 工具能力。上传资料后提问，可在回答中查看来源引用并展开核对原文。
 
-项目使用 Gradio 提供网页界面，通过 Ollama 运行 BGE-M3，结合 ChromaDB、BM25 和本地 ONNX 重排检索资料，再调用 OpenAI 兼容模型服务生成回答。
+项目使用 Gradio 提供网页界面，通过 Ollama 运行 BGE-M3，结合 ChromaDB、BM25 和本地 ONNX 重排检索资料，再通过 LangChain 调用 OpenAI 兼容模型服务生成回答；保留旧 OpenAI Agents SDK 后端用于对照与回退。
 
 ## 功能
 
@@ -50,6 +50,7 @@ Set-Location D:\miniAgent2.0
 py -3.11 --version
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install --no-deps --no-build-isolation -e .
 ```
 
 直接调用虚拟环境中的 Python，无需执行激活脚本。Linux / macOS 使用 `.venv/bin/python` 替换解释器路径，并相应调整命令写法。
@@ -61,7 +62,7 @@ py -3.11 -m venv .venv
 ```powershell
 ollama list
 ollama pull bge-m3
-.\.venv\Scripts\python.exe src\setup_reranker.py
+.\.venv\Scripts\python.exe -m miniagent.cli.setup_reranker
 ```
 
 如果 Ollama 尚未运行，可在另一终端执行 `ollama serve`。
@@ -93,8 +94,8 @@ SUMMARY_MODEL=your_chat_model
 ### 4. 自检并启动
 
 ```powershell
-.\.venv\Scripts\python.exe src\startup_check.py
-.\.venv\Scripts\python.exe src\knowledge_assistant.py
+.\.venv\Scripts\python.exe -m miniagent.cli.doctor
+.\.venv\Scripts\python.exe -m miniagent
 ```
 
 浏览器访问 <http://127.0.0.1:7860>。自检会检查 Ollama、重排文件、生成模型配置和本地数据库；不会发送生成请求，因此配置检查通过不代表服务端模型一定可用。
@@ -126,7 +127,7 @@ BM25 索引在首次关键词检索时从 Chroma 文本构建，缓存在进程�
 也可以从命令行导入指定文件：
 
 ```powershell
-.\.venv\Scripts\python.exe src\ingest.py "D:\documents\资料.md"
+.\.venv\Scripts\python.exe -m miniagent.knowledge.ingest "D:\documents\资料.md"
 ```
 
 ### 文档更新与恢复
@@ -147,6 +148,8 @@ BM25 索引在首次关键词检索时从 Chroma 文本构建，缓存在进程�
 | `OPENAI_BASE_URL` | 空 | OpenAI 兼容服务地址，建议显式配置 |
 | `CHAT_MODEL` | `deepseek-flash` | 回答模型，按服务商修改 |
 | `SUMMARY_MODEL` | 跟随 `CHAT_MODEL` | 历史摘要模型 |
+| `CHAT_BACKEND` | `langchain` | 新后端；设为 `openai-agents` 可显式回退 |
+| `MODEL_TIMEOUT` / `MODEL_MAX_RETRIES` | `60` / `1` | LangChain 单次请求超时秒数与重试次数 |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama 服务地址 |
 | `RAG_EMBED_MODEL` | `bge-m3:latest` | 文档与问题使用相同的 embedding 模型 |
 | `RAG_RERANK_MODEL_DIR` | `models/bge-reranker-base` | ONNX 重排模型目录 |
@@ -162,23 +165,40 @@ BM25 索引在首次关键词检索时从 Chroma 文本构建，缓存在进程�
 
 ```text
 miniAgent2.0/
-├── src/
-│   ├── knowledge_assistant.py   # 网页、流式聊天与文档管理
-│   ├── ingest.py                # 文档解析、分块与增量导入
-│   ├── rag.py                   # 混合检索、引用与回收站管理
-│   ├── rerank.py                # ONNX CPU 重排
-│   ├── setup_reranker.py        # 固定版本模型下载与校验
-│   ├── memory_store.py          # SQLite 聊天历史
-│   ├── config.py                # 配置与日志
-│   ├── startup_check.py         # 启动自检
-│   └── local.py                 # 独立的本地模型调用示例
-├── tests/                       # 单元测试、集成验证与检索评估
-│   └── fixtures/                # 合成文档与标注问题
-├── .github/workflows/ci.yml     # GitHub Actions
-├── .env.example                 # 配置模板
-├── .gitignore
-├── requirements.txt             # Python 直接依赖
+├── src/miniagent/
+│   ├── application/      # 聊天与文档业务
+│   ├── knowledge/        # 解析、混合检索、ONNX 重排、引用数据
+│   ├── memory/           # SQLite 与存储上下文
+│   ├── adapters/         # LangChain 与旧 SDK
+│   ├── tools/            # 共享 Python 工具
+│   ├── ui/               # 页面、回调、渲染、CSS
+│   ├── cli/              # 自检与模型准备
+│   ├── prompts/          # 回答与摘要模板
+│   ├── workflows/        # 预留 LangGraph 工作流
+│   ├── security/         # 预留安全策略
+│   ├── observability/    # 预留追踪审计
+│   ├── bootstrap.py      # 依赖装配
+│   ├── config.py
+│   └── contracts.py
+├── examples/             # 独立的早期本地模型调用示例
+├── configs/              # 预留策略与实验配置
+├── migrations/           # 预留数据库迁移
+├── tests/
+├── evaluations/
+├── docs/
+├── pyproject.toml
+├── requirements.txt
 └── README.md
+```
+
+详细依赖边界、迁移映射和启动方式见 [架构说明](docs/architecture.md)。
+
+激活指定的 Conda 环境后，可编辑安装项目并使用包入口（不会移动知识库）：
+
+```powershell
+conda activate miniAgent2.0
+python -m pip install --no-deps --no-build-isolation -e .
+python -m miniagent
 ```
 
 运行时目录包括 `knowledge/`（原文与旧版本）、`data/`（向量库、聊天数据库、日志与回收站）、`models/`（重排模型）和 `.cache/`（上传、分词缓存与测试产物）。这些目录及 `.env`、虚拟环境均已加入 `.gitignore`，发布到 GitHub 时不应提交个人资料和密钥。
@@ -186,6 +206,7 @@ miniAgent2.0/
 ## 测试与评估
 
 第一阶段重构的模块边界、离线基线和验收分工见 [阶段说明](docs/phase1.md)。
+第二阶段的环境、启动方式、LangChain 调用流程和验收结果见 [LangChain 接入说明](docs/phase2.md)。
 测试资料全文、问题及安全样例见 [合成资料说明](docs/synthetic-data.md)。
 
 离线单元测试与 GitHub Actions 使用相同方式，不调用 Ollama 或生成模型服务；本地存在重排模型时仍会运行真实 ONNX 测试：

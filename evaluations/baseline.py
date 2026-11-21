@@ -7,7 +7,6 @@ import asyncio
 from dataclasses import replace
 import hashlib
 import importlib.metadata
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -23,7 +22,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 def fixture_embeddings(texts):
     """哈希词袋仅用于确定性回归，不能冒充 BGE-M3 的真实语义效果。"""
-    from rag import tokenize
+    from miniagent.knowledge.rag import tokenize
     vectors = []
     for text in texts:
         vector = [0.0] * 64
@@ -45,14 +44,16 @@ class FixedRun:
             type="response.output_text.delta", delta=self.text))
 
 
-def run(output_dir, legacy_entry=None):
+def run(output_dir):
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     workspace = Path(tempfile.mkdtemp(prefix="baseline-", dir=output_dir))
     # 必须在导入界面和配置前设置，旧入口的导入初始化也只能接触隔离数据库。
     os.environ["MEMORY_DB_PATH"] = str(workspace / "memory.sqlite3")
-    from ingest import ingest_file
-    from rag import KnowledgeBase
+    # 固定旧 SDK 输出的基线不能意外改为真实 LangChain 调用。
+    os.environ["CHAT_BACKEND"] = "openai-agents"
+    from miniagent.knowledge.ingest import ingest_file
+    from miniagent.knowledge.rag import KnowledgeBase
     fixture_path = ROOT / "tests/fixtures/retrieval_cases.json"
     fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
     kb = KnowledgeBase(workspace / "chroma", workspace / "knowledge")
@@ -69,12 +70,7 @@ def run(output_dir, legacy_entry=None):
                 ranked_ids=[hit["id"] for hit in hits],
                 sources=[hit["source"] for hit in hits[:4]]))
 
-    if legacy_entry:
-        spec = importlib.util.spec_from_file_location("baseline_legacy", legacy_entry)
-        app = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(app)
-    else:
-        import knowledge_assistant as app
+    from miniagent.ui import handlers as app
     app.settings = replace(app.settings, memory_db=workspace / "memory.sqlite3")
     chat = []
     async def collect(message, use_knowledge, hits, reply):
@@ -104,8 +100,12 @@ def run(output_dir, legacy_entry=None):
         python=platform.python_version(),
         dependencies={name: importlib.metadata.version(name) for name in
                       ["openai-agents", "chromadb", "gradio", "onnxruntime"]},
-        source_sha256={name: hashlib.sha256((ROOT / "src" / name).read_bytes()).hexdigest()
-                       for name in ["rag.py", "ingest.py", "rerank.py", "memory_store.py"]},
+        # 目录迁移后记录真实实现的哈希，不能只记录几行兼容入口。
+        source_sha256={name: hashlib.sha256((ROOT / "src/miniagent" / relative).read_bytes()).hexdigest()
+                       for name, relative in {
+                           "rag.py": "knowledge/rag.py", "ingest.py": "knowledge/ingest.py",
+                           "rerank.py": "knowledge/rerank.py", "memory_store.py": "memory/memory_store.py",
+                       }.items()},
         retrieval=retrieval, chat=chat, persisted_message_count=app._get_memory_store().message_count(),
         limitations="Synthetic mechanics and fixed-output compatibility only; no live LLM or embedding quality assessment.")
     report_path = workspace / "report.json"
@@ -117,10 +117,9 @@ def run(output_dir, legacy_entry=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=ROOT / ".cache/phase1")
-    parser.add_argument("--legacy-entry", type=Path, help="已保存的旧入口，仅用于迁移对照")
     parser.add_argument("--compare", type=Path, help="对照已有 report.json 的功能结果")
     args = parser.parse_args()
-    current = run(args.output_dir, args.legacy_entry)
+    current = run(args.output_dir)
     if args.compare:
         previous = json.loads(args.compare.read_text(encoding="utf-8"))
         for key in ["fixture_sha256", "source_sha256", "retrieval", "chat", "persisted_message_count"]:

@@ -25,10 +25,12 @@ def main():
     (ROOT / ".cache").mkdir(exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix="chat-ui-smoke-", dir=ROOT / ".cache"))
     os.environ["MEMORY_DB_PATH"] = str(root / "memory.sqlite3")
+    # 这个脚本固定模拟旧 SDK；新后端的 HTTP/流式协议由第二阶段专用测试验证。
+    os.environ["CHAT_BACKEND"] = "openai-agents"
     # 延迟导入：原入口仍会初始化页面历史，必须先配置隔离的存储路径。
     from gradio_client import Client
-    import knowledge_assistant as app
-    from rag import KnowledgeBase
+    from miniagent.ui import handlers as app
+    from miniagent.knowledge.rag import KnowledgeBase
     app.knowledge_base = KnowledgeBase(root / "chroma", root / "knowledge")
     hit = dict(id="fixture", source="合成维护.md", location="正文", text="冷却液每九天更换。")
     with patch.object(app.knowledge_base, "retrieve", return_value=dict(candidates=[hit], selected=[hit])) as retrieve, \

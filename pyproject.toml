@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "miniagent-knowledge"
+version = "0.2.0"
+description = "Personal knowledge RAG assistant with incremental security enhancements"
+readme = "README.md"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[project.scripts]
+miniagent = "miniagent.ui.app:launch"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["miniagent*"]
+
+[tool.setuptools.package-data]
+miniagent = ["prompts/*.md", "ui/assets/*.css"]

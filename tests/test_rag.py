@@ -8,8 +8,10 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from ingest import ingest_file, make_chunks, extract_sections
-from rag import KnowledgeBase, evidence_json, source_footer
+from miniagent.knowledge.ingest import ingest_file, make_chunks, extract_sections
+from miniagent.knowledge.rag import KnowledgeBase
+from miniagent.knowledge.citations import evidence_json
+from miniagent.ui.renderers import source_footer
 
 
 @unittest.skipIf(os.getenv("MINIAGENT_OFFLINE_TESTS") == "1", "离线 CI 不调用 Ollama；本地运行完整集成测试")

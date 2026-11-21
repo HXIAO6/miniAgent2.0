@@ -5,7 +5,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from rerank import reranker, DEFAULT_MODEL_DIR
+from miniagent.knowledge.rerank import reranker, DEFAULT_MODEL_DIR
 
 
 @unittest.skipUnless((DEFAULT_MODEL_DIR / "onnx/model_int8.onnx").is_file(), "需要先下载重排模型")

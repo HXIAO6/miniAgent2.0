@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, Mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from chat_service import stream_chat
-from contracts import ChatDependencies, ChatRequest
+from miniagent.application.chat import stream_chat
+from miniagent.contracts import ChatDependencies, ChatRequest
 
 
 def sdk_text(text):

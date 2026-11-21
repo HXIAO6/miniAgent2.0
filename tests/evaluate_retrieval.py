@@ -8,8 +8,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from ingest import ingest_file
-from rag import KnowledgeBase, select_context
+from miniagent.knowledge.ingest import ingest_file
+from miniagent.knowledge.rag import KnowledgeBase, select_context
 
 
 def evaluate(top_k=4, candidate_k=20):

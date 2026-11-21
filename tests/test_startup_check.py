@@ -8,8 +8,8 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-import config
-import startup_check
+from miniagent import config
+from miniagent.cli import doctor as startup_check
 
 
 class StartupCheckTests(unittest.TestCase):

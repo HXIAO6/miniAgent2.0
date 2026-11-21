@@ -1,3 +1,4 @@
+"""保留早期本地模型调用示例，与正式知识库应用分开；请单独配置本地服务地址。"""
 import os
 from dotenv import load_dotenv
 from agents import Agent, Runner

@@ -1,15 +1,11 @@
-"""复用原有 SDK 的聊天服务：检索、模型执行与事件输出，不创建界面。"""
+"""复用原有检索的聊天服务：选择模型后端并输出统一事件，不创建界面。"""
 import ast
 import asyncio
 import copy
 import time
 
-if __package__:
-    from .contracts import ChatRequest, ChatEvent, ChatDependencies
-    from .rag import evidence_json
-else:
-    from contracts import ChatRequest, ChatEvent, ChatDependencies
-    from rag import evidence_json
+from miniagent.contracts import ChatRequest, ChatEvent, ChatDependencies, ModelEvent
+from miniagent.knowledge.citations import evidence_json
 
 
 def message_content_to_text(content):
@@ -33,8 +29,33 @@ def message_content_to_text(content):
     return str(content) if content is not None else ""
 
 
+async def model_events(messages, dependencies, strict):
+    """隔离两个框架的事件格式，保留旧 SDK 以便明确回退和基线对照。"""
+    if dependencies.backend is not None:
+        messages = await dependencies.backend.compress_history(messages)
+        async for event in dependencies.backend.stream(messages, strict=strict):
+            yield event
+        return
+    agent = dependencies.agent
+    if strict:
+        agent = agent.clone(tools=[], instructions=agent.instructions +
+            "\n本轮为仅依据知识库模式，只能使用本轮参考资料回答；历史聊天不作为事实证据。"
+            "不使用常识补全缺失信息，明确指出资料不足的部分。")
+    messages = await dependencies.compress_history(messages)
+    result = dependencies.runner.run_streamed(agent, messages)
+    async for event in result.stream_events():
+        if event.type == "raw_response_event" and hasattr(event.data, "delta"):
+            event_type = getattr(event.data, "type", "")
+            if event_type in {"response.reasoning_summary_text.delta", "response.reasoning_text.delta"}:
+                yield ModelEvent("reasoning", event.data.delta)
+            elif event_type == "response.output_text.delta":
+                yield ModelEvent("text", event.data.delta)
+        elif event.type == "run_item_stream_event" and event.name == "tool_called":
+            yield ModelEvent("tool", getattr(event.item.raw_item, "name", "未知工具"))
+
+
 async def stream_chat(request: ChatRequest, dependencies: ChatDependencies):
-    """第一阶段只抽取流程；保持严格模式、引用校验和旧 SDK 调用方式。"""
+    """保持既有检索与引用行为，模型接入通过依赖选择。"""
     history = request.history or []
     message = request.message
     use_knowledge = request.use_knowledge
@@ -127,32 +148,19 @@ async def stream_chat(request: ChatRequest, dependencies: ChatDependencies):
                 current_reply = "当前知识库中没有找到足够相关的资料，无法依据已有文档回答。请补充资料或检查检索设置。"
                 yield snapshot(kind="refusal", update_scores=True, persist=True)
                 return
-            # 严格知识库模式禁用联网及文件工具，防止模型绕过选中的资料补全未知事实。
-            active_agent = dependencies.agent.clone(
-                tools=[], instructions=dependencies.agent.instructions +
-                "\n本轮为仅依据知识库模式，只能使用本轮参考资料回答；历史聊天不作为事实证据。"
-                "不使用常识补全缺失信息，明确指出资料不足的部分。")
-        else:
-            active_agent = dependencies.agent
-        conversation_history = await dependencies.compress_history(conversation_history)
-        result = dependencies.runner.run_streamed(active_agent, conversation_history)
-        async for event in result.stream_events():
-            if event.type == "raw_response_event" and hasattr(event.data, "delta"):
-                event_type = getattr(event.data, "type", "")
-                if event_type in {"response.reasoning_summary_text.delta", "response.reasoning_text.delta"}:
-                    thinking_text += event.data.delta
+        async for event in model_events(conversation_history, dependencies, use_knowledge and only_knowledge):
+            if event.kind in {"reasoning", "text"}:
+                if event.kind == "reasoning":
+                    thinking_text += event.text
                     expanded = True
-                elif event_type == "response.output_text.delta":
+                else:
                     if thinking_finished_at is None:
                         thinking_finished_at = time.monotonic()
-                    current_reply += event.data.delta
+                    current_reply += event.text
                     expanded = False
-                else:
-                    continue
                 yield snapshot(expanded=expanded)
-            elif event.type == "run_item_stream_event" and event.name == "tool_called":
-                tool_name = getattr(event.item.raw_item, "name", "未知工具")
-                thinking_text += f"\n\n🔧 正在调用工具：{tool_name}"
+            elif event.kind == "tool":
+                thinking_text += f"\n\n🔧 正在调用工具：{event.text}"
                 yield snapshot(expanded=True)
     except Exception as error:
         dependencies.logger.error("聊天请求失败，类型=%s", type(error).__name__)
