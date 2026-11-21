@@ -27,13 +27,15 @@ def inspect_text(text):
         "credential_material": r"\bsk-[a-z0-9_-]{16,}|-----begin (?:rsa |ec |openssh )?private key-----",
     }
     codes = tuple(code for code, pattern in rules.items() if re.search(pattern, normalized, re.S))
-    if any(secret and len(secret) >= 6 and secret in text for secret in (settings.openai_api_key, settings.tavily_api_key)):
+    if any(secret and len(secret) >= 6 and secret in text for secret in (settings.openai_api_key, settings.tavily_api_key, settings.langsmith_api_key)):
         codes += ("configured_secret",)
     return codes
 
 
 def audit(stage, outcome, codes=(), source=""):
     """审计只保存阶段、决策、规则和来源摘要，不记录用户问题或原文。"""
+    from miniagent.observability.tracing import security_decision
+    security_decision(stage, outcome)
     logger.info("security stage=%s outcome=%s codes=%s source_hash=%s", stage, outcome,
                 ",".join(codes) or "none", hashlib.sha256(source.encode()).hexdigest()[:16] if source else "none")
 

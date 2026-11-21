@@ -52,6 +52,12 @@ class Settings:
     # 服务端安全配置不接受聊天参数覆盖；默认只开放时间工具。
     security_policy_path: Path = _path("SECURITY_POLICY_PATH", PROJECT_DIR / "configs" / "security.json")
     tool_workspace: Path = _path("TOOL_WORKSPACE", PROJECT_DIR / "tool_workspace")
+    # 应用自定义摘要追踪，框架的原始 Prompt 自动追踪继续关闭。
+    trace_enabled: bool = _bool("MINIAGENT_TRACE_ENABLED", True)
+    trace_dir: Path = _path("MINIAGENT_TRACE_DIR", PROJECT_DIR / "data" / "traces")
+    langsmith_export_enabled: bool = _bool("MINIAGENT_LANGSMITH_EXPORT", False)
+    langsmith_api_key: str = field(default=os.getenv("LANGSMITH_API_KEY", ""), repr=False)
+    langsmith_endpoint: str = os.getenv("MINIAGENT_LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
     data_dir: Path = PROJECT_DIR / "data"
     knowledge_dir: Path = PROJECT_DIR / "knowledge"
     memory_db: Path = _path("MEMORY_DB_PATH", PROJECT_DIR / "data" / "memory.sqlite3")

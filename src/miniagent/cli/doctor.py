@@ -70,6 +70,10 @@ def run_startup_checks() -> list[tuple[str, bool, str]]:
         checks.append(("安全策略", True, f"策略有效；普通聊天允许 {len(policy.allowed_tools)} 个工具，文件写入未开放。"))
     except (OSError, ValueError, TypeError):
         checks.append(("安全策略", False, "策略文件缺失或无效；请检查 SECURITY_POLICY_PATH，不会自动关闭防护。"))
+    checks.append(("运行摘要", True, "本地统计已开启，无问题/回答原文。" if settings.trace_enabled else "本地统计已关闭。"))
+    checks.append(("LangSmith 摘要导出", not settings.langsmith_export_enabled or bool(settings.langsmith_api_key),
+                   "手动导出已开启；未发送网络请求。" if settings.langsmith_export_enabled
+                   else "远程导出默认关闭；不会自动上传。"))
     logger.info("启动自检完成：%s", "; ".join(f"{name}={'通过' if ok else '注意'}" for name, ok, _ in checks))
     return checks
 

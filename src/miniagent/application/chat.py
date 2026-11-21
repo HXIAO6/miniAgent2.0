@@ -8,6 +8,7 @@ from miniagent.contracts import ChatRequest, ChatEvent, ChatDependencies, ModelE
 from miniagent.knowledge.citations import evidence_json
 from miniagent.security.policy import get_policy
 from miniagent.security.output import guarded_events
+from miniagent.observability.tracing import observed_events
 
 
 def message_content_to_text(content):
@@ -60,7 +61,7 @@ async def stream_chat(request: ChatRequest, dependencies: ChatDependencies):
     """统一经过应用图路由，原执行函数继续负责回答和持久化标记。"""
     from miniagent.workflows.chat_graph import stream_workflow
     try:
-        async for event in guarded_events(stream_workflow(request, dependencies, _execute_chat)):
+        async for event in observed_events(guarded_events(stream_workflow(request, dependencies, _execute_chat)), request):
             yield event
     except Exception as error:
         dependencies.logger.error("工作流失败，类型=%s", type(error).__name__)
