@@ -40,8 +40,6 @@ class Settings:
     strict_knowledge_default: bool = _bool("STRICT_KNOWLEDGE_DEFAULT", True)
     data_dir: Path = PROJECT_DIR / "data"
     knowledge_dir: Path = PROJECT_DIR / "knowledge"
-    sessions_dir: Path = PROJECT_DIR / "sessions"
-    history_file: Path = PROJECT_DIR / "sessions" / "knowledge_history.json"
     memory_db: Path = _path("MEMORY_DB_PATH", PROJECT_DIR / "data" / "memory.sqlite3")
     chroma_dir: Path = PROJECT_DIR / "data" / "chroma"
     log_file: Path = PROJECT_DIR / "data" / "logs" / "miniagent.log"

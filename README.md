@@ -156,7 +156,7 @@ BM25 索引在首次关键词检索时从 Chroma 文本构建，缓存在进程�
 | `STRICT_KNOWLEDGE_DEFAULT` | `true` | 默认仅依据知识库回答 |
 | `MEMORY_DB_PATH` | `data/memory.sqlite3` | SQLite 聊天数据库路径 |
 
-上下文超过 30 条消息时压缩较早内容，保留最近 8 条原文；SQLite 中仍保存完整历史。首次启动可迁移旧版 `sessions/knowledge_history.json`，原文件保留为备份。当前没有自动提取长期用户事实或偏好的独立记忆系统。
+上下文超过 30 条消息时压缩较早内容，保留最近 8 条原文；SQLite 中仍保存完整历史。当前没有自动提取长期用户事实或偏好的独立记忆系统。
 
 ## 项目结构
 
@@ -181,7 +181,7 @@ miniAgent2.0/
 └── README.md
 ```
 
-运行时目录包括 `knowledge/`（原文与旧版本）、`data/`（向量库、聊天数据库、日志与回收站）、`models/`（重排模型）、`sessions/`（旧历史）和 `.cache/`（上传、分词缓存与测试产物）。这些目录及 `.env`、虚拟环境均已加入 `.gitignore`，发布到 GitHub 时不应提交个人资料和密钥。
+运行时目录包括 `knowledge/`（原文与旧版本）、`data/`（向量库、聊天数据库、日志与回收站）、`models/`（重排模型）和 `.cache/`（上传、分词缓存与测试产物）。这些目录及 `.env`、虚拟环境均已加入 `.gitignore`，发布到 GitHub 时不应提交个人资料和密钥。
 
 ## 测试与评估
 

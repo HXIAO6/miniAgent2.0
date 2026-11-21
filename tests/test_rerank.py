@@ -1,5 +1,6 @@
 """阈值、无证据拒答、引用编号等边界使用固定分数测试，避免依赖模型偶然输出。"""
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 import sys
 import tempfile
@@ -63,7 +64,7 @@ class RerankPipelineTests(unittest.TestCase):
         root = Path(tempfile.mkdtemp(prefix="refusal-tests-", dir=ROOT / ".cache"))
         async def collect():
             return [result async for result in app.predict("无资料的问题", [], True)]
-        with patch.object(app, "HISTORY_FILE", str(root / "history.json")), \
+        with patch.object(app, "settings", replace(app.settings, memory_db=root / "memory.sqlite3")), \
              patch.object(app.knowledge_base, "retrieve", return_value={"candidates": [], "selected": []}), \
              patch.object(app.Runner, "run_streamed") as run, \
              patch.object(app, "compress_history") as compress:

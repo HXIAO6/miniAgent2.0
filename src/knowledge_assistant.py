@@ -13,7 +13,6 @@ import json
 import os
 import sqlite3
 import time
-from pathlib import Path
 
 # 上传缓存放在项目内。必须在导入 Gradio 前设置。
 if __package__:
@@ -48,11 +47,7 @@ set_default_openai_api("chat_completions")
 base_url = settings.openai_base_url
 if base_url:
     os.environ["OPENAI_API_BASE"] = base_url
-# 对话历史放在项目下的 sessions 目录，不混入模型请求内容之外的临时数据。
 tavily_client = TavilyClient(api_key=settings.tavily_api_key or None)
-history_dir = str(settings.sessions_dir)
-os.makedirs(history_dir, exist_ok=True)
-HISTORY_FILE = str(settings.history_file)
 _memory_store = None
 _memory_store_path = None
 ALLOWED_DIR = os.path.normcase(os.path.realpath(project_dir))
@@ -173,16 +168,16 @@ def render_assistant_message(answer, thinking, elapsed_seconds, expanded):
     return f"<details{open_attribute}>\n<summary>用时 {elapsed}</summary>\n\n{thinking_content}\n\n</details>\n\n{answer}"
 
 def load_history():
-    """从 SQLite 读取短期记忆；首次打开时自动导入旧 JSON。"""
+    """从 SQLite 读取短期记忆。"""
     return _get_memory_store().load_messages()
 
 
 def _get_memory_store():
-    """测试替换 HISTORY_FILE 时同步使用隔离数据库，生产环境始终使用 data/memory.sqlite3。"""
+    """使用配置的 SQLite 数据库，路径改变时重新初始化存储。"""
     global _memory_store, _memory_store_path
-    path = str(settings.memory_db) if HISTORY_FILE == str(settings.history_file) else str(Path(HISTORY_FILE).with_suffix(".sqlite3"))
+    path = str(settings.memory_db)
     if _memory_store is None or _memory_store_path != path:
-        _memory_store = MemoryStore(path, HISTORY_FILE)
+        _memory_store = MemoryStore(path)
         _memory_store_path = path
     return _memory_store
 
@@ -333,7 +328,7 @@ async def predict(message, history, use_knowledge=True, top_k=4, candidate_k=20,
         logger.error("聊天记录保存失败，类型=%s", type(error).__name__)
 
 def clear_history():
-    """清空 SQLite 当前会话；保留旧 JSON 备份，不删除知识库。"""
+    """清空 SQLite 当前会话，不删除知识库。"""
     _get_memory_store().clear()
     return [], ""
 

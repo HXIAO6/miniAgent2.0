@@ -1,5 +1,6 @@
 """Optional full smoke test: local UI plus one request to the configured LLM."""
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 import sys
 import tempfile
@@ -21,7 +22,7 @@ async def main():
     source.write_text("# 星舟设备\n星舟设备的冷却液更换周期是九天。", encoding="utf-8")
     await asyncio.to_thread(ingest_file, source, kb)
     app.knowledge_base = kb
-    app.HISTORY_FILE = str(root / "history.json")
+    app.settings = replace(app.settings, memory_db=root / "memory.sqlite3")
     try:
         app.demo.launch(server_name="127.0.0.1", server_port=7861,
                         prevent_thread_lock=True, inbrowser=False, quiet=True)
