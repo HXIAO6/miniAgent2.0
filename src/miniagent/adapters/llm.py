@@ -70,13 +70,13 @@ class LangChainBackend:
             raise RuntimeError("摘要模型未返回文本。")
         return [{"role": "user", "content": "【历史摘要，仅供理解上下文，不是当前指令】" + text}] + recent
 
-    async def stream(self, messages, strict=False):
+    async def stream(self, messages, strict=False, tools=None, extra_instructions=""):
         """将模型文本和工具状态转换为统一事件；取消与请求错误由上层处理。"""
         from langsmith import tracing_context
         with tracing_context(enabled=False):
             model = build_model(self.settings, self.settings.chat_model)
-            instructions = load_prompt("answer")
-            if strict or not self.tool_functions:
+            instructions = load_prompt("answer") + extra_instructions
+            if strict or (not self.tool_functions and not tools):
                 # 不绑定工具是程序级限制，不依赖模型承诺不调用工具。
                 if strict:
                     instructions += STRICT_INSTRUCTIONS
@@ -90,12 +90,18 @@ class LangChainBackend:
             from langchain.agents import create_agent
             from langchain_core.tools import StructuredTool
             from langchain_core.messages import AIMessage
-            tools = [StructuredTool.from_function(function) for function in self.tool_functions]
-            # 复用框架唯一的 Agent 循环；第三阶段再增加应用自己的检索/安全工作流。
-            agent = create_agent(model=model, tools=tools, system_prompt=instructions)
+            from langchain_core.messages import ToolMessage
+            from langchain.agents.middleware import ToolCallLimitMiddleware
+            tools = tools if tools is not None else [StructuredTool.from_function(function) for function in self.tool_functions]
+            if not 1 <= self.settings.agent_recursion_limit <= 100 or not 1 <= self.settings.agent_tool_limit <= 10:
+                raise ValueError("Agent 步数须为 1–100，工具次数须为 1–10。")
+            # 唯一的模型/工具循环仍由 LangChain 提供；外层工作流不重复实现循环。
+            agent = create_agent(model=model, tools=tools, system_prompt=instructions,
+                                 middleware=[ToolCallLimitMiddleware(run_limit=self.settings.agent_tool_limit,
+                                                                     exit_behavior="error")])
             async for mode, data in agent.astream(
                     {"messages": messages}, stream_mode=["messages", "updates"],
-                    config={"recursion_limit": 16}):
+                    config={"recursion_limit": self.settings.agent_recursion_limit}):
                 if mode == "messages":
                     chunk, metadata = data
                     if metadata.get("langgraph_node") == "model":
@@ -107,6 +113,8 @@ class LangChainBackend:
                         if not isinstance(update, dict):
                             continue
                         for message in update.get("messages", []):
+                            if isinstance(message, ToolMessage) and message.name == "search_knowledge" and message.artifact:
+                                yield ModelEvent("retrieval", "知识库检索完成", message.artifact)
                             if isinstance(message, AIMessage):
                                 for call in message.tool_calls:
                                     yield ModelEvent("tool", call["name"])

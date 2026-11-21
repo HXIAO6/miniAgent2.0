@@ -36,6 +36,9 @@ class Settings:
     chat_backend: str = os.getenv("CHAT_BACKEND", "langchain").strip().lower()
     model_timeout: float = float(os.getenv("MODEL_TIMEOUT", "60"))
     model_max_retries: int = int(os.getenv("MODEL_MAX_RETRIES", "1"))
+    # 一轮自动知识库问答的工具调用和图步数上限，避免重复检索耗尽资源。
+    agent_tool_limit: int = int(os.getenv("AGENT_TOOL_LIMIT", "3"))
+    agent_recursion_limit: int = int(os.getenv("AGENT_RECURSION_LIMIT", "16"))
     openai_api_key: str = field(default=os.getenv("OPENAI_API_KEY", ""), repr=False)
     openai_base_url: str = os.getenv("OPENAI_BASE_URL", "")
     tavily_api_key: str = field(default=os.getenv("TAVILY_API_KEY", ""), repr=False)

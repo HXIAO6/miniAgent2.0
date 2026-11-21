@@ -16,6 +16,8 @@ class ChatRequest:
     rerank_threshold: float = 0.2
     rerank_k: int = 20
     only_knowledge: bool = True
+    # forced 保持旧行为；auto 仅适用于 LangChain，模型决定是否查询知识库。
+    knowledge_mode: str = "forced"
 
 
 @dataclass(frozen=True)
@@ -53,3 +55,4 @@ class ModelEvent:
 
     kind: str
     text: str
+    data: dict = field(default_factory=dict)

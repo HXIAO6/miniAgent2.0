@@ -1,6 +1,6 @@
 # 当前目录与依赖边界
 
-本次是包结构与职责拆分，不是第三阶段 Agent 工作流升级。
+本文记录当前包结构与职责边界；第三阶段的工作流详见 [阶段说明](phase3.md)。
 核心实现位于 `src/miniagent/`；根目录 `.env`、`knowledge/`、`models/` 和 `data/` 的含义及路径保持不变。
 
 ```text
@@ -40,7 +40,7 @@ miniAgent2.0/
 │   │   │   ├── doctor.py          # 启动自检
 │   │   │   └── setup_reranker.py  # 模型下载与校验
 │   │   ├── prompts/               # 原回答与摘要 Prompt
-│   │   ├── workflows/             # 预留自定义 LangGraph 工作流
+│   │   ├── workflows/             # 已实现模式路由与单轮状态
 │   │   ├── security/              # 预留后续安全机制
 │   │   └── observability/         # 预留追踪和审计
 ├── examples/local_model.py        # 与正式应用分开的本地调用示例
@@ -66,7 +66,7 @@ miniAgent2.0/
 
 原 Chroma/BM25/ONNX 算法没有重写。`rag.py` 仍有原有索引和文档回收实现，后续有真实需求时再抽存储接口，避免本次引入第二套存储实现。
 引用数据直接使用 `knowledge.citations`，界面展示直接使用 `ui.renderers`；检索模块不再反向导入界面。
-预留目录的说明不表示已经实现权限、审批、注入检测或 LangSmith 审计。
+security 与 observability 仍为预留目录，不表示已经实现权限、审批、注入检测或 LangSmith 审计。
 
 ## 安装与启动
 

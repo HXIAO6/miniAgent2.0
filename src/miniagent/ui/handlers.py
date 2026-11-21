@@ -37,13 +37,14 @@ def _persist_turn(ui_history):
 
 async def predict(message, history, use_knowledge=True, top_k=4, candidate_k=20,
                   retrieval_mode="hybrid", show_scores=False, use_rerank=True,
-                  rerank_threshold=DEFAULT_RERANK_THRESHOLD, rerank_k=20, only_knowledge=settings.strict_knowledge_default):
+                  rerank_threshold=DEFAULT_RERANK_THRESHOLD, rerank_k=20, only_knowledge=settings.strict_knowledge_default,
+                  knowledge_mode="forced"):
     """将服务事件转换为原有 Gradio 回调格式，保持网页 API 和 SQLite 格式兼容。"""
     request = ChatRequest(
         message=message, history=history or [], use_knowledge=use_knowledge,
         top_k=top_k, candidate_k=candidate_k, retrieval_mode=retrieval_mode,
         use_rerank=use_rerank, rerank_threshold=rerank_threshold,
-        rerank_k=rerank_k, only_knowledge=only_knowledge)
+        rerank_k=rerank_k, only_knowledge=only_knowledge, knowledge_mode=knowledge_mode)
     # 应用装配层选择模型后端，回调只负责事件到控件数据的转换。
     dependencies = build_chat_dependencies(settings, knowledge_base, logger, Runner, compress_history)
     async for event in stream_chat(request, dependencies):
@@ -81,12 +82,12 @@ async def upload_documents(files, chunk_chars=1200, overlap_chars=180):
 
 async def predict_with_scores(message, history, use_knowledge, top_k, candidate_k, retrieval_mode,
                               use_rerank=True, rerank_threshold=DEFAULT_RERANK_THRESHOLD,
-                              rerank_k=20, only_knowledge=settings.strict_knowledge_default):
+                              rerank_k=20, only_knowledge=settings.strict_knowledge_default, knowledge_mode="forced"):
     """前端同时更新聊天与候选表；流式文字到达时保留已经展示的分数。"""
     first = True
     async for result in predict(message, history, use_knowledge, top_k, candidate_k, retrieval_mode,
                                 show_scores=True, use_rerank=use_rerank, rerank_threshold=rerank_threshold,
-                                rerank_k=rerank_k, only_knowledge=only_knowledge):
+                                rerank_k=rerank_k, only_knowledge=only_knowledge, knowledge_mode=knowledge_mode):
         if len(result) == 3:
             yield result
         else:

@@ -36,6 +36,10 @@ def create_app(handlers=None):
             deletion_status = gr.Textbox(label="删除结果", interactive=False)
         use_knowledge = gr.Checkbox(value=True, label="优先检索知识库（普通闲聊时可关闭）")
         only_knowledge = gr.Checkbox(value=settings.strict_knowledge_default, label="仅依据知识库回答（无依据时直接说明；关闭联网和文件工具）")
+        knowledge_mode = gr.Dropdown(choices=[("强制知识库检索（原行为）", "forced"),
+                                              ("Agent 自动决定是否检索", "auto")],
+                                     value="forced", label="知识库调用模式")
+        gr.Markdown("自动模式需启用知识库，仅开放知识库查询工具，由模型决定是否查询；“仅依据知识库回答”开关适用于强制模式。关闭知识库则为原普通聊天。")
         with gr.Accordion("检索设置与候选分数", open=False, elem_classes="module-panel"):
             retrieval_mode = gr.Dropdown(choices=[("混合检索（推荐）", "hybrid"),
                                                  ("仅向量检索", "vector"), ("仅关键词 BM25", "bm25")],
@@ -63,7 +67,7 @@ def create_app(handlers=None):
         with gr.Row(elem_classes="clear-chat-row"):
             clear = gr.Button("清空聊天", variant="secondary", scale=0, min_width=150)
         msg.submit(handlers.predict_with_scores, [msg, chatbot, use_knowledge, top_k, candidate_k, retrieval_mode,
-                                       use_rerank, rerank_threshold, rerank_k, only_knowledge],
+                                       use_rerank, rerank_threshold, rerank_k, only_knowledge, knowledge_mode],
                    [msg, chatbot, scores], concurrency_limit=1, concurrency_id="knowledge_operations")
         clear.click(handlers.clear_history, None, [chatbot, msg], queue=False)
         # 导入、删除和整轮聊天共用一个队列，避免正在生成的回答与删除操作交错。

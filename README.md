@@ -13,8 +13,9 @@
 - **文档管理**：重复导入跳过、同名更新、重新分块、确认删除及回收站备份。
 - **对话记录**：SQLite 保存聊天历史，较长上下文通过摘要压缩。
 - **Agent 工具**：普通聊天模式支持时间查询、Tavily 联网搜索和项目目录内的文件读写。
+- **自动知识库 Agent**：LangGraph 路由后由模型决定是否调用 `search_knowledge`；保留强制检索模式用于可靠问答和对照。
 
-默认启用“优先检索知识库”和“仅依据知识库回答”。检索在每次提问前由程序执行；仅依据知识库模式禁用工具，无片段通过筛选时直接提示资料不足。
+默认启用知识库并采用强制检索、仅依据知识库回答：程序先检索，无片段通过筛选时直接提示资料不足。切换到“Agent 自动决定是否检索”后，由模型选择调用知识库工具，该模式不开放文件或联网工具；仅依据知识库开关只作用于强制模式。
 
 文档解析、向量生成、检索和重排在本机完成；问题、参与回答的历史与检索片段会发送到配置的模型服务。是否离线运行取决于生成模型服务的部署方式。
 
@@ -150,6 +151,7 @@ BM25 索引在首次关键词检索时从 Chroma 文本构建，缓存在进程�
 | `SUMMARY_MODEL` | 跟随 `CHAT_MODEL` | 历史摘要模型 |
 | `CHAT_BACKEND` | `langchain` | 新后端；设为 `openai-agents` 可显式回退 |
 | `MODEL_TIMEOUT` / `MODEL_MAX_RETRIES` | `60` / `1` | LangChain 单次请求超时秒数与重试次数 |
+| `AGENT_TOOL_LIMIT` / `AGENT_RECURSION_LIMIT` | `3` / `16` | 每轮工具调用次数与框架图步数上限 |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama 服务地址 |
 | `RAG_EMBED_MODEL` | `bge-m3:latest` | 文档与问题使用相同的 embedding 模型 |
 | `RAG_RERANK_MODEL_DIR` | `models/bge-reranker-base` | ONNX 重排模型目录 |
@@ -174,7 +176,7 @@ miniAgent2.0/
 │   ├── ui/               # 页面、回调、渲染、CSS
 │   ├── cli/              # 自检与模型准备
 │   ├── prompts/          # 回答与摘要模板
-│   ├── workflows/        # 预留 LangGraph 工作流
+│   ├── workflows/        # LangGraph 模式路由与请求状态
 │   ├── security/         # 预留安全策略
 │   ├── observability/    # 预留追踪审计
 │   ├── bootstrap.py      # 依赖装配
@@ -207,6 +209,7 @@ python -m miniagent
 
 第一阶段重构的模块边界、离线基线和验收分工见 [阶段说明](docs/phase1.md)。
 第二阶段的环境、启动方式、LangChain 调用流程和验收结果见 [LangChain 接入说明](docs/phase2.md)。
+第三阶段的自动检索、工具预算和真实资料验收见 [LangGraph 工作流说明](docs/phase3.md)。
 测试资料全文、问题及安全样例见 [合成资料说明](docs/synthetic-data.md)。
 
 离线单元测试与 GitHub Actions 使用相同方式，不调用 Ollama 或生成模型服务；本地存在重排模型时仍会运行真实 ONNX 测试：

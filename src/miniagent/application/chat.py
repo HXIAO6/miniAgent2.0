@@ -55,6 +55,19 @@ async def model_events(messages, dependencies, strict):
 
 
 async def stream_chat(request: ChatRequest, dependencies: ChatDependencies):
+    """统一经过应用图路由，原执行函数继续负责回答和持久化标记。"""
+    from miniagent.workflows.chat_graph import stream_workflow
+    try:
+        async for event in stream_workflow(request, dependencies, _execute_chat):
+            yield event
+    except Exception as error:
+        dependencies.logger.error("工作流失败，类型=%s", type(error).__name__)
+        history = [message for message in request.history if isinstance(message, dict)]
+        yield ChatEvent(kind="error", history=history + [{"role": "user", "content": request.message}],
+                        answer=f"❌ 发生错误: {error}", update_scores=True, persist=True)
+
+
+async def _execute_chat(request: ChatRequest, dependencies: ChatDependencies):
     """保持既有检索与引用行为，模型接入通过依赖选择。"""
     history = request.history or []
     message = request.message
@@ -162,6 +175,12 @@ async def stream_chat(request: ChatRequest, dependencies: ChatDependencies):
             elif event.kind == "tool":
                 thinking_text += f"\n\n🔧 正在调用工具：{event.text}"
                 yield snapshot(expanded=True)
+            elif event.kind == "retrieval":
+                # 自动工具返回的原始资料决定引用编号，不让模型提供文件名或位置。
+                candidates = event.data["candidates"]
+                retrieved = event.data["selected"]
+                thinking_text += f"\n知识库已调用 {event.data['calls']} 次，累计选择 {len(retrieved)} 个片段。"
+                yield snapshot(expanded=True, update_scores=True)
     except Exception as error:
         dependencies.logger.error("聊天请求失败，类型=%s", type(error).__name__)
         current_reply = f"❌ 发生错误: {error}"
